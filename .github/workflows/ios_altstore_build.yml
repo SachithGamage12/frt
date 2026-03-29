@@ -28,20 +28,31 @@ jobs:
       - name: Build iOS App (Release, No Code Sign)
         run: flutter build ios --release --no-codesign || true
 
+      - name: Build Runner.app with xcodebuild (Force Unsigned)
+        run: |
+          cd ios
+          xcodebuild build -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+
       - name: Package .app into .ipa for AltStore
         run: |
-          # Create Payload directory
-          mkdir -p build/ios/iphoneos/Payload
+          mkdir -p Payload
+          # Locate Runner.app dynamically to prevent path issues
+          APP_PATH=$(find . -name "Runner.app" -type d | grep "Release" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find . -name "Runner.app" -type d | head -n 1)
+          fi
           
-          # Move the Runner.app into the Payload directory
-          mv build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: Runner.app not found!"
+            exit 1
+          fi
           
-          # Zip the Payload directory into a .ipa file
-          cd build/ios/iphoneos
+          echo "Found Runner.app at: $APP_PATH"
+          cp -R "$APP_PATH" Payload/
           zip -r Runner.ipa Payload/
 
       - name: Upload .ipa Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Runner-AltStore-App
-          path: build/ios/iphoneos/Runner.ipa
+          path: Runner.ipa
