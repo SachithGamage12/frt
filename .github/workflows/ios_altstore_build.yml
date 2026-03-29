@@ -19,6 +19,12 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Disable Xcode Code Signing
+        run: |
+          echo "CODE_SIGNING_ALLOWED=NO" >> ios/Flutter/Debug.xcconfig
+          echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Debug.xcconfig
+          echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Debug.xcconfig
+          
       - name: Build iOS Debug (No Code Sign)
         run: flutter build ios --debug --no-codesign
 
