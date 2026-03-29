@@ -1,0 +1,41 @@
+name: Build Unsigned iOS App for AltStore
+
+on:
+  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS Debug (No Code Sign)
+        run: flutter build ios --debug --no-codesign
+
+      - name: Package into .ipa for AltStore
+        run: |
+          # Create Payload directory
+          mkdir -p build/ios/iphoneos/Payload
+          
+          # Move the Runner.app into the Payload directory
+          mv build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+          
+          # Zip the Payload directory into a .ipa file
+          cd build/ios/iphoneos
+          zip -r Runner.ipa Payload/
+
+      - name: Upload .ipa Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Runner-AltStore-App
+          path: build/ios/iphoneos/Runner.ipa
