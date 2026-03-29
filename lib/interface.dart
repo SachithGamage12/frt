@@ -1040,4 +1040,4 @@ void startLocationUpdates() async {
   });
 
   FlutterForegroundTask.setOnLockScreenVisibility(true);
-}z
+}
