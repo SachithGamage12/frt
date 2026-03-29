@@ -11,6 +11,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Link Firebase GoogleService-Info to Xcode
+        run: |
+          gem install xcodeproj
+          cat << 'EOF' > add_firebase.rb
+          require 'xcodeproj'
+          project_path = 'ios/Runner.xcodeproj'
+          project = Xcodeproj::Project.open(project_path)
+          target = project.targets.find { |t| t.name == 'Runner' }
+          file_path = 'Runner/GoogleService-Info.plist'
+          file_ref = project.main_group.find_file_by_path(file_path) || project.main_group.new_file(file_path)
+          unless target.resources_build_phase.files_references.include?(file_ref)
+            target.resources_build_phase.add_file_reference(file_ref)
+            puts "GoogleService-Info.plist perfectly embedded inside your app bundle!"
+          end
+          project.save
+          EOF
+          ruby add_firebase.rb
+          rm add_firebase.rb
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
