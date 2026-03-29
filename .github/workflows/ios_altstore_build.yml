@@ -21,27 +21,27 @@ jobs:
 
       - name: Disable Xcode Code Signing
         run: |
-          echo "CODE_SIGNING_ALLOWED=NO" >> ios/Flutter/Debug.xcconfig
-          echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Debug.xcconfig
-          echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Debug.xcconfig
+          echo "CODE_SIGNING_ALLOWED=NO" >> ios/Flutter/Release.xcconfig
+          echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Release.xcconfig
+          echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Release.xcconfig
           
-      - name: Build iOS Debug (No Code Sign)
-        run: flutter build ios --debug --no-codesign
+      - name: Build Unsigned iOS Archive (Release)
+        run: flutter build ipa --release --no-codesign
 
-      - name: Package into .ipa for AltStore
+      - name: Package .xcarchive into .ipa for AltStore
         run: |
           # Create Payload directory
-          mkdir -p build/ios/iphoneos/Payload
+          mkdir -p build/ios/Payload
           
-          # Move the Runner.app into the Payload directory
-          mv build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+          # Move the Runner.app from xcarchive into the Payload directory
+          mv build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app build/ios/Payload/
           
           # Zip the Payload directory into a .ipa file
-          cd build/ios/iphoneos
+          cd build/ios
           zip -r Runner.ipa Payload/
 
       - name: Upload .ipa Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Runner-AltStore-App
-          path: build/ios/iphoneos/Runner.ipa
+          path: build/ios/Runner.ipa
