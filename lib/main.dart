@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'interface.dart'; // Adjust path if different
+import 'payment_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -89,12 +90,22 @@ class _FRTAnimationPageState extends State<FRTAnimationPage> with SingleTickerPr
 
       if (doc.exists && doc.data()?['password'] == password) {
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => InterfacePage(userId: mobile),
-            ),
-          );
+          final isUnlocked = doc.data()?['isAppUnlocked'] == true;
+          if (isUnlocked) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => InterfacePage(userId: mobile),
+              ),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PaymentPage(userId: mobile, userData: doc.data() as Map<String, dynamic>),
+              ),
+            );
+          }
           return;
         }
       }
@@ -279,12 +290,22 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           await prefs.setBool('rememberMe', false);
         }
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => InterfacePage(userId: _mobileController.text),
-          ),
-        );
+        final isUnlocked = doc.data()?['isAppUnlocked'] == true;
+        if (isUnlocked) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => InterfacePage(userId: _mobileController.text),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PaymentPage(userId: _mobileController.text, userData: doc.data() as Map<String, dynamic>),
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Invalid mobile number or password')),
@@ -304,9 +325,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         children: [
           // Background Gradient
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.purple.shade800, Colors.blue.shade800],
+                colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -456,7 +477,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     height: 100,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.yellow.shade700, Colors.orange.shade700],
+                        colors: [Color(0xFF00E5FF), Color(0xFF00B4D8)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -603,6 +624,9 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
         'profilePicture': imageUrl,
         'mobile': _mobileController.text,
         'timestamp': FieldValue.serverTimestamp(),
+        'isAppUnlocked': false,
+        'generatedPromoCode': '',
+        'isPromoCodeUsed': false,
       });
 
       setState(() {
@@ -632,9 +656,9 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
         children: [
           // Background Gradient
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.purple.shade800, Colors.blue.shade800],
+                colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -653,8 +677,8 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
                   child: Container(
                     width: MediaQuery.of(context).size.width * 0.8,
                     height: MediaQuery.of(context).size.width * 0.8,
-                    decoration: BoxDecoration(
-                      color: Colors.yellow.shade700,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF00E5FF),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -743,7 +767,7 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
                     : ElevatedButton(
                         onPressed: _saveData,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.yellow.shade700,
+                          backgroundColor: const Color(0xFF00E5FF),
                           padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                         ),
                         child: const Text(
@@ -789,7 +813,7 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
                     height: 100,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.yellow.shade700, Colors.orange.shade700],
+                        colors: [Color(0xFF00E5FF), Color(0xFF00B4D8)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -901,10 +925,13 @@ class _TellUsAboutYouPageState extends State<TellUsAboutYouPage> with SingleTick
         const SnackBar(content: Text('Data saved successfully')),
       );
 
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(widget.userId).get();
+      Map<String, dynamic>? userData = userDoc.data() as Map<String, dynamic>?;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => InterfacePage(userId: widget.userId),
+          builder: (context) => PaymentPage(userId: widget.userId, userData: userData ?? {}),
         ),
       );
     } catch (e) {
@@ -921,9 +948,9 @@ class _TellUsAboutYouPageState extends State<TellUsAboutYouPage> with SingleTick
         children: [
           // Background Gradient
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.purple.shade800, Colors.blue.shade800],
+                colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -942,8 +969,8 @@ class _TellUsAboutYouPageState extends State<TellUsAboutYouPage> with SingleTick
                   child: Container(
                     width: MediaQuery.of(context).size.width * 0.8,
                     height: MediaQuery.of(context).size.width * 0.8,
-                    decoration: BoxDecoration(
-                      color: Colors.yellow.shade700,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF00E5FF),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1041,7 +1068,7 @@ class _TellUsAboutYouPageState extends State<TellUsAboutYouPage> with SingleTick
                 ElevatedButton(
                   onPressed: _saveData,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.yellow.shade700,
+                    backgroundColor: const Color(0xFF00E5FF),
                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
                   ),
                   child: const Text(
@@ -1071,7 +1098,7 @@ class _TellUsAboutYouPageState extends State<TellUsAboutYouPage> with SingleTick
                     height: 100,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.yellow.shade700, Colors.orange.shade700],
+                        colors: [Color(0xFF00E5FF), Color(0xFF00B4D8)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),

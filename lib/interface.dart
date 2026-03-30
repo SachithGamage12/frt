@@ -8,6 +8,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'user_details_page.dart';
 import 'location_view_page.dart';
+import 'call_page.dart';
 
 class InterfacePage extends StatefulWidget {
   final String userId;
@@ -18,7 +19,8 @@ class InterfacePage extends StatefulWidget {
   _InterfacePageState createState() => _InterfacePageState();
 }
 
-class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserver {
+class _InterfacePageState extends State<InterfacePage>
+    with WidgetsBindingObserver {
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
   bool _showPopup = false;
@@ -30,6 +32,8 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
   bool _isSharingLiveLocation = false;
   String? _liveLocationSharingId;
   List<Map<String, dynamic>> _familyMembers = [];
+  StreamSubscription<DocumentSnapshot>? _callSubscription;
+  bool _isCallDialogShowing = false;
 
   @override
   void initState() {
@@ -41,6 +45,92 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
     _loadFamilyMembers();
     _requestBatteryOptimization();
     _resumeLiveLocationSharing();
+    _listenForIncomingCalls();
+  }
+
+  void _listenForIncomingCalls() {
+    _callSubscription = FirebaseFirestore.instance
+        .collection('calls')
+        .doc(widget.userId)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists) {
+        final data = snapshot.data();
+        if (data != null && !_isCallDialogShowing) {
+          _isCallDialogShowing = true;
+          _showIncomingCallDialog(data);
+        }
+      }
+    });
+  }
+
+  void _showIncomingCallDialog(Map<String, dynamic> callData) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('Incoming Call from ${callData['callerName'] ?? 'Unknown'}'),
+        content: const Text('Do you want to accept this call?'),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              // Decline
+              await FirebaseFirestore.instance.collection('calls').doc(widget.userId).delete().catchError((e){});
+              if (mounted) {
+                Navigator.pop(context);
+              }
+              _isCallDialogShowing = false;
+            },
+            child: const Text('Decline', style: TextStyle(color: Colors.red)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _isCallDialogShowing = false;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CallPage(
+                    channelName: callData['channelName'],
+                    callerId: callData['callerId'],
+                    calleeId: widget.userId,
+                    isCaller: false,
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Accept', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _initiateCall(String targetUserId, String targetUserName) async {
+    final channelName = 'room_${widget.userId}_$targetUserId';
+    
+    // Create ringing doc for target
+    await FirebaseFirestore.instance.collection('calls').doc(targetUserId).set({
+      'callerId': widget.userId,
+      'callerName': _userData?['name'] ?? 'Family Member',
+      'channelName': channelName,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CallPage(
+            channelName: channelName,
+            callerId: widget.userId,
+            calleeId: targetUserId,
+            isCaller: true,
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -50,6 +140,7 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
     _positionStream?.cancel();
     _stopLiveLocationSharing();
     FlutterForegroundTask.stopService();
+    _callSubscription?.cancel();
     super.dispose();
   }
 
@@ -67,7 +158,8 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'location_channel',
         channelName: 'Location Updates',
-        channelDescription: 'This notification keeps the app running for live location sharing.',
+        channelDescription:
+            'This notification keeps the app running for live location sharing.',
         channelImportance: NotificationChannelImportance.LOW,
         priority: NotificationPriority.LOW,
         iconData: const NotificationIconData(
@@ -104,10 +196,11 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
 
   Future<void> _fetchUserData() async {
     try {
-      final DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .get();
+      final DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(widget.userId)
+              .get();
 
       if (userDoc.exists) {
         setState(() {
@@ -119,9 +212,9 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
           _isLoading = false;
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('User not found')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('User not found')));
         }
       }
     } catch (e) {
@@ -129,34 +222,36 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching user data: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error fetching user data: $e')));
       }
     }
   }
 
   Future<void> _loadFamilyMembers() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .collection('familyMembers')
-          .orderBy('timestamp', descending: true)
-          .get();
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(widget.userId)
+              .collection('familyMembers')
+              .orderBy('timestamp', descending: true)
+              .get();
 
       setState(() {
-        _familyMembers = snapshot.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'id': doc.id,
-            'userId': data['userId'],
-            'name': data['name'],
-            'profilePicture': data['profilePicture'],
-            'locationData': data['locationData'],
-            'timestamp': data['timestamp'],
-          };
-        }).toList();
+        _familyMembers =
+            snapshot.docs.map((doc) {
+              final data = doc.data();
+              return {
+                'id': doc.id,
+                'userId': data['userId'],
+                'name': data['name'],
+                'profilePicture': data['profilePicture'],
+                'locationData': data['locationData'],
+                'timestamp': data['timestamp'],
+              };
+            }).toList();
       });
     } catch (e) {
       if (mounted) {
@@ -181,12 +276,12 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
             .collection('familyMembers')
             .doc(userId)
             .set({
-          'userId': userId,
-          'name': userData['name'],
-          'profilePicture': userData['profilePicture'],
-          'locationData': userData['locationData'],
-          'timestamp': FieldValue.serverTimestamp(),
-        });
+              'userId': userId,
+              'name': userData['name'],
+              'profilePicture': userData['profilePicture'],
+              'locationData': userData['locationData'],
+              'timestamp': FieldValue.serverTimestamp(),
+            });
 
         await _loadFamilyMembers();
       }
@@ -205,7 +300,9 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Location services are disabled. Please enable them.'),
+            content: const Text(
+              'Location services are disabled. Please enable them.',
+            ),
             action: SnackBarAction(
               label: 'Settings',
               onPressed: Geolocator.openLocationSettings,
@@ -240,7 +337,8 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text(
-                'Location permissions are permanently denied. Please enable them in settings.'),
+              'Location permissions are permanently denied. Please enable them in settings.',
+            ),
             action: SnackBarAction(
               label: 'Settings',
               onPressed: Geolocator.openLocationSettings,
@@ -258,7 +356,8 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text(
-                  'Background location permission required for live tracking. Please allow "Always".'),
+                'Background location permission required for live tracking. Please allow "Always".',
+              ),
               action: SnackBarAction(
                 label: 'Settings',
                 onPressed: Geolocator.openLocationSettings,
@@ -293,20 +392,21 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error getting location: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error getting location: $e')));
       }
     }
   }
 
   Future<void> _resumeLiveLocationSharing() async {
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.userId)
-        .collection('liveSharing')
-        .doc('current')
-        .get();
+    final userDoc =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(widget.userId)
+            .collection('liveSharing')
+            .doc('current')
+            .get();
 
     if (userDoc.exists && userDoc.data()?['sharingId'] != null) {
       final sharingId = userDoc.data()!['sharingId'] as String;
@@ -330,18 +430,20 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
     String? sharingId;
 
     // Check if there's an existing sharingId in Firestore
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.userId)
-        .collection('liveSharing')
-        .doc('current')
-        .get();
+    final userDoc =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(widget.userId)
+            .collection('liveSharing')
+            .doc('current')
+            .get();
 
     if (userDoc.exists && userDoc.data()?['sharingId'] != null) {
       sharingId = userDoc.data()!['sharingId'] as String;
     } else {
       // Generate a new sharingId if none exists
-      sharingId = FirebaseFirestore.instance.collection('liveLocations').doc().id;
+      sharingId =
+          FirebaseFirestore.instance.collection('liveLocations').doc().id;
       // Save the new sharingId to Firestore
       await FirebaseFirestore.instance
           .collection('users')
@@ -349,9 +451,9 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
           .collection('liveSharing')
           .doc('current')
           .set({
-        'sharingId': sharingId,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+            'sharingId': sharingId,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
     }
 
     setState(() {
@@ -362,21 +464,30 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
     // Save data for foreground task
     await FlutterForegroundTask.saveData(key: 'sharingId', value: sharingId);
     await FlutterForegroundTask.saveData(key: 'userId', value: widget.userId);
-    await FlutterForegroundTask.saveData(key: 'userName', value: _userData?['name'] ?? 'Unknown');
-    await FlutterForegroundTask.saveData(key: 'profilePicture', value: _userData?['profilePicture'] ?? '');
+    await FlutterForegroundTask.saveData(
+      key: 'userName',
+      value: _userData?['name'] ?? 'Unknown',
+    );
+    await FlutterForegroundTask.saveData(
+      key: 'profilePicture',
+      value: _userData?['profilePicture'] ?? '',
+    );
 
     // Get initial position and save to Firestore
     Position initialPosition = await Geolocator.getCurrentPosition();
-    await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set({
-      'userId': widget.userId,
-      'latitude': initialPosition.latitude,
-      'longitude': initialPosition.longitude,
-      'heading': initialPosition.heading,
-      'speed': initialPosition.speed,
-      'timestamp': FieldValue.serverTimestamp(),
-      'userName': _userData?['name'] ?? 'Unknown',
-      'profilePicture': _userData?['profilePicture'],
-    });
+    await FirebaseFirestore.instance
+        .collection('liveLocations')
+        .doc(sharingId)
+        .set({
+          'userId': widget.userId,
+          'latitude': initialPosition.latitude,
+          'longitude': initialPosition.longitude,
+          'heading': initialPosition.heading,
+          'speed': initialPosition.speed,
+          'timestamp': FieldValue.serverTimestamp(),
+          'userName': _userData?['name'] ?? 'Unknown',
+          'profilePicture': _userData?['profilePicture'],
+        });
 
     // Start position stream
     _positionStream?.cancel();
@@ -385,20 +496,26 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: 5,
       ),
-    ).listen((Position position) async {
-      await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set({
-        'userId': widget.userId,
-        'latitude': position.latitude,
-        'longitude': position.longitude,
-        'heading': position.heading,
-        'speed': position.speed,
-        'timestamp': FieldValue.serverTimestamp(),
-        'userName': _userData?['name'] ?? 'Unknown',
-        'profilePicture': _userData?['profilePicture'],
-      });
-    }, onError: (e) {
-      print('Position stream error: $e');
-    });
+    ).listen(
+      (Position position) async {
+        await FirebaseFirestore.instance
+            .collection('liveLocations')
+            .doc(sharingId)
+            .set({
+              'userId': widget.userId,
+              'latitude': position.latitude,
+              'longitude': position.longitude,
+              'heading': position.heading,
+              'speed': position.speed,
+              'timestamp': FieldValue.serverTimestamp(),
+              'userName': _userData?['name'] ?? 'Unknown',
+              'profilePicture': _userData?['profilePicture'],
+            });
+      },
+      onError: (e) {
+        print('Position stream error: $e');
+      },
+    );
 
     await _startForegroundTask();
 
@@ -413,7 +530,12 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
     });
   }
 
-  String _encodeLocationData(double lat, double lng, {bool isLive = false, String? sharingId}) {
+  String _encodeLocationData(
+    double lat,
+    double lng, {
+    bool isLive = false,
+    String? sharingId,
+  }) {
     final userData = {
       'userId': widget.userId,
       'name': _userData?['name'] ?? 'Unknown',
@@ -442,7 +564,10 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
 
   Future<void> _stopLiveLocationSharing() async {
     if (_liveLocationSharingId != null) {
-      await FirebaseFirestore.instance.collection('liveLocations').doc(_liveLocationSharingId).delete();
+      await FirebaseFirestore.instance
+          .collection('liveLocations')
+          .doc(_liveLocationSharingId)
+          .delete();
       // Clear the stored sharingId
       await FirebaseFirestore.instance
           .collection('users')
@@ -467,10 +592,9 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => UserDetailsPage(
-          userData: _userData!,
-          userId: widget.userId,
-        ),
+        builder:
+            (context) =>
+                UserDetailsPage(userData: _userData!, userId: widget.userId),
       ),
     );
   }
@@ -516,19 +640,24 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
     if (_currentPosition != null) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => LocationViewPage(
-            latitude: _currentPosition!.latitude,
-            longitude: _currentPosition!.longitude,
-            profilePicture: _userData?['profilePicture'],
-            userName: _userData?['name'] ?? 'You',
-            isLive: _isSharingLiveLocation,
-            sharingId: _liveLocationSharingId,
-          ),
+          builder:
+              (context) => LocationViewPage(
+                latitude: _currentPosition!.latitude,
+                longitude: _currentPosition!.longitude,
+                profilePicture: _userData?['profilePicture'],
+                userName: _userData?['name'] ?? 'You',
+                isLive: _isSharingLiveLocation,
+                sharingId: _liveLocationSharingId,
+              ),
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No location data available. Please fetch your location first.')),
+        const SnackBar(
+          content: Text(
+            'No location data available. Please fetch your location first.',
+          ),
+        ),
       );
     }
   }
@@ -560,10 +689,7 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
       }
     } catch (e) {
       if (code.startsWith('live:')) {
-        _showScannedUserProfile(
-          userName: 'Unknown User',
-          locationData: code,
-        );
+        _showScannedUserProfile(userName: 'Unknown User', locationData: code);
       } else {
         _showScannedUserProfile(
           userName: 'Unknown Location',
@@ -581,68 +707,77 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
   }) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        contentPadding: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (profilePicture != null)
-              Container(
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                  image: DecorationImage(
-                    image: NetworkImage(profilePicture),
-                    fit: BoxFit.cover,
+      builder:
+          (context) => AlertDialog(
+            contentPadding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (profilePicture != null)
+                  Container(
+                    height: 200,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
+                      image: DecorationImage(
+                        image: NetworkImage(profilePicture),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Text(
+                        userName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Tap to view location',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Text(
-                    userName,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                const Divider(height: 1),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _navigateToLocationView(
+                            locationData,
+                            userName,
+                            profilePicture,
+                          );
+                        },
+                        child: const Text('VIEW LOCATION'),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Tap to view location',
-                    style: TextStyle(
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _navigateToLocationView(locationData, userName, profilePicture);
-                    },
-                    child: const Text('VIEW LOCATION'),
-                  ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
-  void _navigateToLocationView(String locationData, String userName, String? profilePicture) {
+  void _navigateToLocationView(
+    String locationData,
+    String userName,
+    String? profilePicture,
+  ) {
     try {
       final decodedData = jsonDecode(locationData);
       if (decodedData is Map<String, dynamic>) {
@@ -651,14 +786,15 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
           if (sharingId != null) {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => LocationViewPage(
-                  latitude: 0,
-                  longitude: 0,
-                  profilePicture: profilePicture,
-                  userName: userName,
-                  isLive: true,
-                  sharingId: sharingId,
-                ),
+                builder:
+                    (context) => LocationViewPage(
+                      latitude: 0,
+                      longitude: 0,
+                      profilePicture: profilePicture,
+                      userName: userName,
+                      isLive: true,
+                      sharingId: sharingId,
+                    ),
               ),
             );
             return;
@@ -669,12 +805,13 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
           if (lat != null && lng != null) {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => LocationViewPage(
-                  latitude: lat,
-                  longitude: lng,
-                  profilePicture: profilePicture,
-                  userName: userName,
-                ),
+                builder:
+                    (context) => LocationViewPage(
+                      latitude: lat,
+                      longitude: lng,
+                      profilePicture: profilePicture,
+                      userName: userName,
+                    ),
               ),
             );
             return;
@@ -686,14 +823,15 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
         final sharingId = locationData.substring(5);
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => LocationViewPage(
-              latitude: 0,
-              longitude: 0,
-              profilePicture: profilePicture,
-              userName: userName,
-              isLive: true,
-              sharingId: sharingId,
-            ),
+            builder:
+                (context) => LocationViewPage(
+                  latitude: 0,
+                  longitude: 0,
+                  profilePicture: profilePicture,
+                  userName: userName,
+                  isLive: true,
+                  sharingId: sharingId,
+                ),
           ),
         );
       } else {
@@ -704,12 +842,13 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
           if (lat != null && lng != null) {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => LocationViewPage(
-                  latitude: lat,
-                  longitude: lng,
-                  profilePicture: profilePicture,
-                  userName: userName,
-                ),
+                builder:
+                    (context) => LocationViewPage(
+                      latitude: lat,
+                      longitude: lng,
+                      profilePicture: profilePicture,
+                      userName: userName,
+                    ),
               ),
             );
           }
@@ -743,10 +882,7 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
       appBar: AppBar(
         title: const Text(
           'Family Road Track App',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.yellowAccent[700],
         actions: [
@@ -776,29 +912,55 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
                       itemBuilder: (context, index) {
                         final member = _familyMembers[index];
                         return Dismissible(
-                          key: Key(member['id'] ?? member['userId'] ?? index.toString()),
+                          key: Key(
+                            member['id'] ??
+                                member['userId'] ??
+                                index.toString(),
+                          ),
                           background: Container(
                             color: Colors.red,
                             alignment: Alignment.centerRight,
                             padding: const EdgeInsets.only(right: 20),
-                            child: const Icon(Icons.delete, color: Colors.white),
+                            child: const Icon(
+                              Icons.delete,
+                              color: Colors.white,
+                            ),
                           ),
                           direction: DismissDirection.endToStart,
                           onDismissed: (direction) {
                             _removeFamilyMember(member['id']);
                           },
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                              vertical: 8.0,
+                            ),
                             child: Card(
                               elevation: 2,
                               child: ListTile(
                                 leading: CircleAvatar(
-                                  backgroundImage: NetworkImage(member['profilePicture'] ?? ''),
+                                  backgroundImage: NetworkImage(
+                                    member['profilePicture'] ?? '',
+                                  ),
                                   radius: 25,
                                 ),
                                 title: Text(member['name'] ?? 'Unknown'),
                                 subtitle: const Text('Tap to view location'),
-                                trailing: const Icon(Icons.chevron_right),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.call, color: Colors.green),
+                                      onPressed: () {
+                                        _initiateCall(
+                                          member['userId'], 
+                                          member['name'] ?? 'Unknown'
+                                        );
+                                      },
+                                    ),
+                                    const Icon(Icons.chevron_right),
+                                  ],
+                                ),
                                 onTap: () {
                                   if (member['locationData'] != null) {
                                     _navigateToLocationView(
@@ -852,37 +1014,40 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
                   onPressed: () {
                     showModalBottomSheet(
                       context: context,
-                      builder: (context) => Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ListTile(
-                            leading: const Icon(Icons.qr_code_scanner),
-                            title: const Text('Scan QR Code'),
-                            onTap: () {
-                              Navigator.pop(context);
-                              _toggleScanner();
-                            },
+                      builder:
+                          (context) => Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                leading: const Icon(Icons.qr_code_scanner),
+                                title: const Text('Scan QR Code'),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _toggleScanner();
+                                },
+                              ),
+                              if (!_isSharingLiveLocation)
+                                ListTile(
+                                  leading: const Icon(Icons.location_searching),
+                                  title: const Text('Share Live Location'),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _startLiveLocationSharing();
+                                  },
+                                ),
+                              if (_isSharingLiveLocation)
+                                ListTile(
+                                  leading: const Icon(Icons.location_off),
+                                  title: const Text(
+                                    'Stop Sharing Live Location',
+                                  ),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _stopLiveLocationSharing();
+                                  },
+                                ),
+                            ],
                           ),
-                          if (!_isSharingLiveLocation)
-                            ListTile(
-                              leading: const Icon(Icons.location_searching),
-                              title: const Text('Share Live Location'),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _startLiveLocationSharing();
-                              },
-                            ),
-                          if (_isSharingLiveLocation)
-                            ListTile(
-                              leading: const Icon(Icons.location_off),
-                              title: const Text('Stop Sharing Live Location'),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _stopLiveLocationSharing();
-                              },
-                            ),
-                        ],
-                      ),
                     );
                   },
                   child: const Icon(Icons.add),
@@ -998,14 +1163,19 @@ class _InterfacePageState extends State<InterfacePage> with WidgetsBindingObserv
 
 void startLocationUpdates() async {
   LocationPermission permission = await Geolocator.checkPermission();
-  if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+  if (permission == LocationPermission.denied ||
+      permission == LocationPermission.deniedForever) {
     permission = await Geolocator.requestPermission();
   }
 
-  final sharingId = await FlutterForegroundTask.getData(key: 'sharingId') as String?;
+  final sharingId =
+      await FlutterForegroundTask.getData(key: 'sharingId') as String?;
   final userId = await FlutterForegroundTask.getData(key: 'userId') as String?;
-  final userName = await FlutterForegroundTask.getData(key: 'userName') as String? ?? 'Unknown';
-  final profilePicture = await FlutterForegroundTask.getData(key: 'profilePicture') as String?;
+  final userName =
+      await FlutterForegroundTask.getData(key: 'userName') as String? ??
+      'Unknown';
+  final profilePicture =
+      await FlutterForegroundTask.getData(key: 'profilePicture') as String?;
 
   if (sharingId == null || userId == null) {
     FlutterForegroundTask.stopService();
@@ -1018,26 +1188,32 @@ void startLocationUpdates() async {
       accuracy: LocationAccuracy.bestForNavigation,
       distanceFilter: 5,
     ),
-  ).listen((Position position) async {
-    await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set({
-      'userId': userId,
-      'latitude': position.latitude,
-      'longitude': position.longitude,
-      'heading': position.heading,
-      'speed': position.speed,
-      'timestamp': FieldValue.serverTimestamp(),
-      'userName': userName,
-      'profilePicture': profilePicture,
-    });
+  ).listen(
+    (Position position) async {
+      await FirebaseFirestore.instance
+          .collection('liveLocations')
+          .doc(sharingId)
+          .set({
+            'userId': userId,
+            'latitude': position.latitude,
+            'longitude': position.longitude,
+            'heading': position.heading,
+            'speed': position.speed,
+            'timestamp': FieldValue.serverTimestamp(),
+            'userName': userName,
+            'profilePicture': profilePicture,
+          });
 
-    FlutterForegroundTask.updateService(
-      notificationTitle: 'Sharing Live Location',
-      notificationText: 'Your location is being shared with family members.',
-    );
-  }, onError: (e) {
-    print('Foreground position stream error: $e');
-    positionStream?.cancel();
-  });
+      FlutterForegroundTask.updateService(
+        notificationTitle: 'Sharing Live Location',
+        notificationText: 'Your location is being shared with family members.',
+      );
+    },
+    onError: (e) {
+      print('Foreground position stream error: $e');
+      positionStream?.cancel();
+    },
+  );
 
   FlutterForegroundTask.setOnLockScreenVisibility(true);
 }
