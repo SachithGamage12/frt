@@ -19,7 +19,7 @@ class _PaymentPageState extends State<PaymentPage> {
   bool _isLoading = false;
 
   final String merchantId = "1227522";
-  final String merchantSecret = "MzQ1NjE1NjgzMDIzOTY0MDQ1MjgzNzk5ODQ5NTMyMTAyMDE3NDA1Nw==";
+  final String merchantSecret = "MzYxODk5OTE1MTMxMDk2MDE1Nzk0MjA2MTU5NTcwMjg3MjQ4NzI5MQ==";
 
   void _startPayHerePayment() {
     Map paymentObject = {
