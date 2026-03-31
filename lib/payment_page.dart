@@ -37,7 +37,7 @@ class _PaymentPageState extends State<PaymentPage> {
       "notify_url": "https://ent13ttsy2ig.x.pipedream.net/",
       "order_id": "UnlockApp_${widget.userId}",
       "items": "FRT App Unlock & Code Gen",
-      "amount": 300.00,
+      "amount": 350.00,
       "currency": "LKR",
       "first_name": widget.userData['name'] ?? "User",
       "last_name": "",
@@ -255,7 +255,7 @@ class _PaymentPageState extends State<PaymentPage> {
                     child: Column(
                       children: [
                         const Text(
-                          "LKR 300 One-time",
+                          "LKR 350 One-time",
                           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                         const SizedBox(height: 8),
