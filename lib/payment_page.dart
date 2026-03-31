@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:payhere_mobilesdk_flutter/payhere_mobilesdk_flutter.dart';
 import 'dart:math';
 import 'dart:io' show Platform;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'interface.dart'; // To navigate on success
 
 class PaymentPage extends StatefulWidget {
@@ -18,6 +19,22 @@ class PaymentPage extends StatefulWidget {
 class _PaymentPageState extends State<PaymentPage> {
   final TextEditingController _promoCodeController = TextEditingController();
   bool _isLoading = false;
+  String _runtimeBundleId = 'Loading...';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPackageInfo();
+  }
+
+  Future<void> _loadPackageInfo() async {
+    final PackageInfo info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _runtimeBundleId = info.packageName;
+      });
+    }
+  }
 
   String get merchantId {
     if (Platform.isIOS) {
@@ -291,6 +308,10 @@ class _PaymentPageState extends State<PaymentPage> {
                   const SizedBox(height: 30),
                   const Text("OR", style: TextStyle(color: Colors.white54, fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 30),
+
+                  const SizedBox(height: 30),
+                  Text("PayHere Domain: $_runtimeBundleId", style: const TextStyle(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
 
                   // Promo Code Box
                   Container(

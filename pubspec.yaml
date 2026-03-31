@@ -53,6 +53,7 @@ dependencies:
   payhere_mobilesdk_flutter: ^3.2.2
   agora_rtc_engine: ^6.5.3
   uuid: ^4.5.3
+  package_info_plus: ^9.0.1
   
 
 
