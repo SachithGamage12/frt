@@ -19,11 +19,17 @@ class _PaymentPageState extends State<PaymentPage> {
   final TextEditingController _promoCodeController = TextEditingController();
   bool _isLoading = false;
 
-  final String merchantId = "1227522";
+  String get merchantId {
+    if (Platform.isIOS) {
+      return "1234871";
+    } else {
+      return "1227522";
+    }
+  }
   
   String get merchantSecret {
     if (Platform.isIOS) {
-      return "MjY0MDU4MzAzMDIxMjgzNzY4NjUxODQyMzM5Nzc1ODgxMTgyNjY5";
+      return "MTI0NzYzNDE1MDIyMTkzMzQ4ODUxMzAxNjM2MTcxMTQzMDE3MDMwOQ==";
     } else {
       return "MzYxODk5OTE1MTMxMDk2MDE1Nzk0MjA2MTU5NTcwMjg3MjQ4NzI5MQ==";
     }
