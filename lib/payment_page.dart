@@ -46,7 +46,7 @@ class _PaymentPageState extends State<PaymentPage> {
   
   String get merchantSecret {
     if (Platform.isIOS) {
-      return "MTI0NzYzNDE1MDIyMTkzMzQ4ODUxMzAxNjM2MTcxMTQzMDE3MDMwOQ==";
+      return "Mjg3MjU2OTA0Mjc1NzAxNjM3MjMzODE5NzQyMTQ5MDg5MTQ5MDk=";
     } else {
       return "MzYxODk5OTE1MTMxMDk2MDE1Nzk0MjA2MTU5NTcwMjg3MjQ4NzI5MQ==";
     }
