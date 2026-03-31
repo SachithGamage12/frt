@@ -57,7 +57,7 @@ class _PaymentPageState extends State<PaymentPage> {
       "sandbox": true,                 // true if using Sandbox Merchant ID
       "merchant_id": merchantId,       // Gets a Merchant ID from PayHere Account
       "merchant_secret": merchantSecret, // See step 4e
-      "notify_url": "https://ent13ttsy2ig.x.pipedream.net/",
+      "notify_url": "",
       "order_id": "UnlockApp_${widget.userId}",
       "items": "FRT App Unlock & Code Gen",
       "amount": 350.00,
@@ -65,7 +65,7 @@ class _PaymentPageState extends State<PaymentPage> {
       "first_name": widget.userData['name'] ?? "User",
       "last_name": "",
       "email": widget.userData['email'] ?? "test@test.com",
-      "phone": widget.userData['mobile'] ?? widget.userId,
+      "phone": widget.userData['mobile'] ?? "0771234567",
       "address": "Sri Lanka",
       "city": "Colombo",
       "country": "Sri Lanka",
