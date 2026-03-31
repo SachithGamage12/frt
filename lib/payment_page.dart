@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:payhere_mobilesdk_flutter/payhere_mobilesdk_flutter.dart';
 import 'dart:math';
+import 'dart:io' show Platform;
 import 'interface.dart'; // To navigate on success
 
 class PaymentPage extends StatefulWidget {
@@ -19,7 +20,14 @@ class _PaymentPageState extends State<PaymentPage> {
   bool _isLoading = false;
 
   final String merchantId = "1227522";
-  final String merchantSecret = "MzYxODk5OTE1MTMxMDk2MDE1Nzk0MjA2MTU5NTcwMjg3MjQ4NzI5MQ==";
+  
+  String get merchantSecret {
+    if (Platform.isIOS) {
+      return "MzYxODk5OTE1MTMxMDk2MDE1Nzk0MjA2MTU5NTcwMjg3MjQ4NzI5MQ==";
+    } else {
+      return "MzQ1NjE1NjgzMDIzOTY0MDQ1MjgzNzk5ODQ5NTMyMTAyMDE3NDA1Nw==";
+    }
+  }
 
   void _startPayHerePayment() {
     Map paymentObject = {
