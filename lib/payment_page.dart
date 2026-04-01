@@ -67,6 +67,7 @@ class _PaymentPageState extends State<PaymentPage> {
       "amount": "350.00",
       "recurrence": "1 Month",
       "duration": "Forever",
+      "startup_fee": "",
       "currency": "LKR",
       "first_name": widget.userData['name'] ?? "User",
       "last_name": "",

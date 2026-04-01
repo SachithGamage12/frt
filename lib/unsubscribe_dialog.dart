@@ -49,17 +49,16 @@ class _UnsubscribeDialogState extends State<UnsubscribeDialog> {
         );
       }
 
-      // 3. Lock out access in Firestore locally
+      // 3. Don't lock them out instantly, just log the cancellation. The Pipedream webhook 
+      // will cancel the PayHere recurrence. They keep access until the month ends.
       await FirebaseFirestore.instance.collection('users').doc(widget.userId).update({
-        'isAppUnlocked': false,
+        'subscriptionCancelledAt': FieldValue.serverTimestamp(),
       });
 
       if (mounted) {
         // Close dialog
         Navigator.pop(context);
-
-        // Redirect user out of the app to the Auth gateway
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (Route<dynamic> route) => false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Subscription Cancelled! You still have access until the end of your billing cycle.", style: TextStyle(color: Colors.white))));
       }
     } catch (e) {
       setState(() => _isLoading = false);
