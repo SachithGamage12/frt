@@ -75,7 +75,7 @@ class _PaymentPageState extends State<PaymentPage> {
       "delivery_address": "Sri Lanka",
       "delivery_city": "Colombo",
       "delivery_country": "Sri Lanka",
-      "custom_1": "",
+      "custom_1": Platform.isIOS ? "ios" : "android",
       "custom_2": ""
     };
 
