@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'unsubscribe_dialog.dart';
 
 class UserDetailsPage extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -299,6 +300,26 @@ class _UserDetailsPageState extends State<UserDetailsPage> with SingleTickerProv
                                       title: 'Age',
                                       value: widget.userData['age'].toString(),
                                     ),
+                                  const SizedBox(height: 30),
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      showDialog(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (ctx) => UnsubscribeDialog(
+                                          userId: widget.userId,
+                                          userData: widget.userData,
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.cancel_outlined, color: Colors.white),
+                                    label: const Text("Cancel Subscription", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.redAccent.shade400,
+                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    ),
+                                  ),
                                   const SizedBox(height: 80), // Space for FAB
                                 ],
                               ),

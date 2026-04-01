@@ -63,6 +63,11 @@
 		<string>fetch</string>
 		<string>remote-notification</string>
 		<string>location</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>dev.flutter.background.refresh</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app requires microphone access for Voice Calls with your contacts.</string>

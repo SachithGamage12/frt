@@ -57,10 +57,13 @@ class _PaymentPageState extends State<PaymentPage> {
       "sandbox": true,                 // true if using Sandbox Merchant ID
       "merchant_id": merchantId,       // Gets a Merchant ID from PayHere Account
       "merchant_secret": merchantSecret, // See step 4e
-      "notify_url": "",
+      "notify_url": "REPLACE_WITH_PIPEDREAM_URL", // Needs Pipedream backend listener
       "order_id": "UnlockApp_${widget.userId}",
-      "items": "FRT App Unlock & Code Gen",
+      "items": "FRT App Monthly Premium",
       "amount": 350.00,
+      "recurrence": "1 Month",
+      "duration": "Forever",
+      "startup_fee": "0.00",
       "currency": "LKR",
       "first_name": widget.userData['name'] ?? "User",
       "last_name": "",
@@ -278,7 +281,7 @@ class _PaymentPageState extends State<PaymentPage> {
                     child: Column(
                       children: [
                         const Text(
-                          "LKR 350 One-time",
+                          "LKR 350 / Month",
                           style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                         const SizedBox(height: 8),
@@ -299,7 +302,7 @@ class _PaymentPageState extends State<PaymentPage> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                 elevation: 8,
                               ),
-                              child: const Text("Pay with PayHere", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              child: const Text("Subscribe via PayHere", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                             ),
                       ],
                     ),
