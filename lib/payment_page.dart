@@ -19,6 +19,7 @@ class PaymentPage extends StatefulWidget {
 class _PaymentPageState extends State<PaymentPage> {
   final TextEditingController _promoCodeController = TextEditingController();
   bool _isLoading = false;
+  bool _isGatewayOpen = false;
   String _runtimeBundleId = 'Loading...';
 
   @override
@@ -53,6 +54,9 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   void _startPayHerePayment() {
+    if (_isGatewayOpen) return;
+    setState(() => _isGatewayOpen = true);
+
     Map paymentObject = {
       "sandbox": true,                 // true if using Sandbox Merchant ID
       "merchant_id": merchantId,       // Gets a Merchant ID from PayHere Account
@@ -82,14 +86,17 @@ class _PaymentPageState extends State<PaymentPage> {
       paymentObject, 
       (paymentId) async {
         print("One Time Payment Success. Payment Id: $paymentId");
+        setState(() => _isGatewayOpen = false);
         await _onPaymentSuccess();
       }, 
       (error) {
         print("One Time Payment Failed. Error: $error");
+        setState(() => _isGatewayOpen = false);
         _showSnackBar("Payment Failed: $error");
       }, 
       () {
         print("One Time Payment Dismissed");
+        setState(() => _isGatewayOpen = false);
         _showSnackBar("Payment Dismissed.");
       }
     );
