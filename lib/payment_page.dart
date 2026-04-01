@@ -57,7 +57,7 @@ class _PaymentPageState extends State<PaymentPage> {
       "sandbox": true,                 // true if using Sandbox Merchant ID
       "merchant_id": merchantId,       // Gets a Merchant ID from PayHere Account
       "merchant_secret": merchantSecret, // See step 4e
-      "notify_url": "REPLACE_WITH_PIPEDREAM_URL", // Needs Pipedream backend listener
+      "notify_url": "https://eokc4138h7hjt29.m.pipedream.net", // Needs Pipedream backend listener
       "order_id": "UnlockApp_${widget.userId}",
       "items": "FRT App Monthly Premium",
       "amount": 350.00,
