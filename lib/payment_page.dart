@@ -60,10 +60,9 @@ class _PaymentPageState extends State<PaymentPage> {
       "notify_url": "https://eokc4138h7hjt29.m.pipedream.net", // Needs Pipedream backend listener
       "order_id": "UnlockApp_${widget.userId}",
       "items": "FRT App Monthly Premium",
-      "amount": 350.00,
+      "amount": "350.00",
       "recurrence": "1 Month",
       "duration": "Forever",
-      "startup_fee": "0.00",
       "currency": "LKR",
       "first_name": widget.userData['name'] ?? "User",
       "last_name": "",
