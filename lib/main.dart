@@ -13,33 +13,44 @@ import 'admin_panel.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  
-  // Request Notification Permissions
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-  await messaging.requestPermission(
-    alert: true,
-    announcement: false,
-    badge: true,
-    carPlay: false,
-    criticalAlert: false,
-    provisional: false,
-    sound: true,
-  );
-
-  // Get and store the token if logged in
-  String? token = await messaging.getToken();
-  print("FCM Token: $token");
-
-  // Handle Foreground Notifications
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    print('Got a message whilst in the foreground!');
-    if (message.notification != null) {
-      print('Message also contained a notification: ${message.notification?.title}');
-    }
-  });
-
+  try {
+    await Firebase.initializeApp();
+    _initializeFCM(); // Non-blocking
+  } catch (e) {
+    print("Firebase initialization error: $e");
+  }
   runApp(const MyApp());
+}
+
+Future<void> _initializeFCM() async {
+  try {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    await messaging.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+
+    // Get and store the token
+    String? token = await messaging.getToken();
+    if (token != null) {
+      print("FCM Token: $token");
+    }
+
+    // Handle Foreground Notifications
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print('Got a message whilst in the foreground!');
+      if (message.notification != null) {
+        print('Message also contained a notification: ${message.notification?.title}');
+      }
+    });
+  } catch (e) {
+    print("Error initializing FCM: $e");
+  }
 }
 
 class MyApp extends StatelessWidget {
