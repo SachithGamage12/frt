@@ -20,7 +20,6 @@ jobs:
           PROVISION_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # 1. Setup Keychain
           CERT_PATH=$RUNNER_TEMP/build_certificate.p12
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           echo -n "$CERTIFICATE_BASE64" | base64 --decode -o $CERT_PATH
@@ -32,29 +31,27 @@ jobs:
           security list-keychains -d user -s $KEYCHAIN_PATH
           security default-keychain -s $KEYCHAIN_PATH
 
-          # 2. Install Provisioning Profile using UUID
           PP_PATH=$RUNNER_TEMP/temp.mobileprovision
           echo -n "$PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
           UUID=$(security cms -D -i $PP_PATH | grep -A 1 "UUID" | tail -1 | sed 's/.*<string>//;s/<\/string>.*//')
-          echo "Profile UUID extracted: $UUID"
+          echo "Profile UUID: $UUID"
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          cp $PP_PATH "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
-          
+          cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+
       - name: Validate Configuration (Debug)
         run: |
-          echo "=== Bundle ID ==="
-          grep "PRODUCT_BUNDLE_IDENTIFIER" ios/Runner.xcodeproj/project.pbxproj | grep "com.sachith" | head -1 | sed 's/.*= //' | sed 's/;//'
           echo "=== Identities ==="
           security find-identity -v -p codesigning
-          echo "=== Profiles ==="
+          echo "=== Profiles dir ==="
           ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/"
 
       - name: Verify Firebase Config
         run: |
           if [ ! -f "ios/Runner/GoogleService-Info.plist" ]; then
-            echo "ERROR: GoogleService-Info.plist missing on GitHub!"
+            echo "ERROR: GoogleService-Info.plist missing!"
             exit 1
           fi
+          echo "GoogleService-Info.plist found OK"
 
       - name: Link Firebase GoogleService-Info
         run: |
@@ -86,21 +83,53 @@ jobs:
           cd ios
           pod install --repo-update
 
-      - name: Build IPA (Verbose)
-        run: |
-          flutter build ipa --release \
-            --export-options-plist=ios/ExportOptions.plist \
-            -v
+      - name: Step 1 - Build Flutter iOS (no sign)
+        run: flutter build ios --release --no-codesign -v
 
-      - name: Find and Diagnostics (Always)
+      - name: Step 2 - Archive with Xcode
+        run: |
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/Runner.xcarchive \
+            -allowProvisioningUpdates \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Development: Sachith Gamage (R5FK77489D)" \
+            PROVISIONING_PROFILE_SPECIFIER="Family Track App" \
+            DEVELOPMENT_TEAM=KMPA36RSLQ \
+            archive \
+            | xcpretty || xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath $RUNNER_TEMP/Runner.xcarchive \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Development: Sachith Gamage (R5FK77489D)" \
+            PROVISIONING_PROFILE_SPECIFIER="Family Track App" \
+            DEVELOPMENT_TEAM=KMPA36RSLQ \
+            archive
+
+      - name: Step 3 - Export IPA from Archive
+        run: |
+          mkdir -p build/ios/ipa
+          xcodebuild \
+            -exportArchive \
+            -archivePath $RUNNER_TEMP/Runner.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -verbose
+
+      - name: Post-build Diagnostics (Always)
         if: always()
         run: |
-          echo "=== Post-build Diagnostics ==="
-          find . -name "*.ipa" || echo "No IPA"
-          find build/ios -name "*.app" 2>/dev/null || echo "No APP"
-          echo "=== Xcode Logs ==="
-          find ~/Library/Logs/gym -name "*.log" 2>/dev/null | head -5 || echo "No gym logs"
-          find ~/Library/Developer/Xcode/DerivedData -name "*.log" 2>/dev/null | head -5 || echo "No derived data logs"
+          echo "=== IPA Search ==="
+          find . -name "*.ipa" 2>/dev/null || echo "No IPA found"
+          echo "=== Archive Search ==="
+          find $RUNNER_TEMP -name "*.xcarchive" 2>/dev/null || echo "No xcarchive"
+          echo "=== Export path ==="
+          ls -la build/ios/ipa/ 2>/dev/null || echo "No ipa dir"
 
       - name: Upload Xcode Logs (On Failure)
         if: failure()
@@ -109,10 +138,9 @@ jobs:
           name: xcode-logs
           path: |
             ~/Library/Logs/gym/*.log
-            ~/Library/Developer/Xcode/DerivedData/**/Logs/**/*.log
           if-no-files-found: warn
 
-      - name: Upload IPA (On Success)
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: release-ipa
