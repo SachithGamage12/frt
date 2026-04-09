@@ -98,7 +98,7 @@ jobs:
             -resultBundlePath $RUNNER_TEMP/ResultBundle \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Development: Sachith Gamage (R5FK77489D)" \
-            PROVISIONING_PROFILE_SPECIFIER="Family Track App" \
+            PROVISIONING_PROFILE="27d3e550-7928-448f-9fd1-0b20fc6e1c78" \
             DEVELOPMENT_TEAM=KMPA36RSLQ \
             archive 2>&1 | tee $RUNNER_TEMP/xcodebuild.log
           echo ""
