@@ -21,8 +21,16 @@ jobs:
           mobileprovision-base64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
-      - name: List Installed Provisioning Profiles
-        run: ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
+      - name: Verify Firebase and Signing Configs
+        run: |
+          if [ ! -f "ios/Runner/GoogleService-Info.plist" ]; then
+            echo "ERROR: GoogleService-Info.plist not found! Make sure it's pushed to GitHub."
+            exit 1
+          fi
+          if [ ! -f "ios/ExportOptions.plist" ]; then
+            echo "ERROR: ExportOptions.plist not found!"
+            exit 1
+          fi
 
       - name: Link Firebase GoogleService-Info to Xcode
         run: |
@@ -47,21 +55,23 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Install dependencies and CocoaPods
+      - name: Clean and Prepare Build Environment
         run: |
+          flutter clean
           flutter pub get
           cd ios
-          pod install || pod update
+          pod install --repo-update
 
-      - name: Build IPA
+      - name: Build IPA (Verbose)
         run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist -v
 
-      - name: Find and Diagnostics (If build fails)
-        if: failure()
+      - name: Find and Diagnostics (Always runs if Build IPA fails)
+        if: always()
         run: |
-          find . -name "*.ipa"
-          find . -name "*.app"
-          ls -R build/ios
+          echo "=== Post-build Diagnostics ==="
+          find . -name "*.ipa" || echo "No IPA found"
+          find . -name "*.app" || echo "No APP found"
+          ls -R build/ios || echo "Build/ios directory missing"
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
@@ -69,3 +79,8 @@ jobs:
           name: release-ipa
           path: build/ios/ipa/*.ipa
           if-no-files-found: error
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db
