@@ -6,7 +6,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'interface.dart';
+import 'main.dart';
 
 class PaymentPage extends StatefulWidget {
   final String userId;
@@ -26,6 +28,34 @@ class _PaymentPageState extends State<PaymentPage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   Timer? _sliderTimer;
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Error', style: TextStyle(color: Colors.redAccent)),
+        content: Text(message, style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(color: Colors.cyanAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (route) => false,
+      );
+    }
+  }
 
   final List<Map<String, String>> _trustInfo = [
     {
@@ -121,7 +151,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
   Future<void> _submitPayment() async {
     if (_selectedFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please upload your payment slip')));
+      _showErrorDialog('Please upload your payment slip');
       return;
     }
 
@@ -136,7 +166,8 @@ class _PaymentPageState extends State<PaymentPage> {
 
       final response = await request.send();
       if (response.statusCode != 200) {
-        throw Exception('Cloudinary upload failed with status ${response.statusCode}');
+        final errorBody = await response.stream.bytesToString();
+        throw Exception('Cloudinary upload failed (${response.statusCode}): $errorBody');
       }
 
       final responseData = await response.stream.bytesToString();
@@ -154,7 +185,7 @@ class _PaymentPageState extends State<PaymentPage> {
       _showSuccessDialog();
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+      _showErrorDialog('Upload failed: $e');
     }
   }
 
@@ -193,14 +224,14 @@ class _PaymentPageState extends State<PaymentPage> {
           .get();
 
       if (query.docs.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid Code')));
+        _showErrorDialog('Invalid Code');
         setState(() => _isLoading = false);
         return;
       }
 
       DocumentSnapshot owner = query.docs.first;
       if (owner.get('isPromoCodeUsed') == true) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code already used')));
+        _showErrorDialog('Code already used');
         setState(() => _isLoading = false);
         return;
       }
@@ -216,7 +247,7 @@ class _PaymentPageState extends State<PaymentPage> {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => InterfacePage(userId: widget.userId)));
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      _showErrorDialog('Error: $e');
     }
   }
 
@@ -224,6 +255,18 @@ class _PaymentPageState extends State<PaymentPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0F2027),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          TextButton.icon(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout, color: Colors.white70, size: 18),
+            label: const Text('Exit to Login', style: TextStyle(color: Colors.white70)),
+          ),
+          const SizedBox(width: 10),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(

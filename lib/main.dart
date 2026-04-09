@@ -122,53 +122,56 @@ class _FRTAnimationPageState extends State<FRTAnimationPage> with SingleTickerPr
     final String? password = prefs.getString('password');
 
     if (mobile != null && password != null) {
-      // Auto login
+      // Admin Check FIRST
+      if (mobile == '0771246939' && password == 'Admin123@j') {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const AdminPanelPage()),
+          );
+        }
+        return;
+      }
+
       final FirebaseFirestore _firestore = FirebaseFirestore.instance;
       final doc = await _firestore.collection('users').doc(mobile).get();
 
-      if (doc.exists && doc.data()?['password'] == password) {
-        if (mounted) {
-          // Admin Check
-          if (mobile == '0771246939' && password == 'Admin123@j') {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const AdminPanelPage()),
-            );
-            return;
-          }
-
-          bool isUnlocked = doc.data()?['isAppUnlocked'] == true;
-          Timestamp? expiry = doc.data()?['subscriptionExpiry'] as Timestamp?;
-          
-          // Store FCM token
-          String? token = await FirebaseMessaging.instance.getToken();
-          if (token != null) {
-            await _firestore.collection('users').doc(mobile).update({'fcmToken': token});
-          }
-
-          // Expiry Check
-          if (isUnlocked && expiry != null && expiry.toDate().isBefore(DateTime.now())) {
-            isUnlocked = false;
-            await _firestore.collection('users').doc(mobile).update({'isAppUnlocked': false});
-          }
-
-          if (isUnlocked) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => InterfacePage(userId: mobile),
-              ),
-            );
-          } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => PaymentPage(userId: mobile, userData: doc.data() as Map<String, dynamic>),
-              ),
-            );
-          }
-          return;
+      bool isUnlocked = doc.data()?['isAppUnlocked'] == true;
+      Timestamp? expiry = doc.data()?['subscriptionExpiry'] as Timestamp?;
+      
+      // Store FCM token (Safe fetch)
+      try {
+        String? token = await FirebaseMessaging.instance.getToken();
+        if (token != null) {
+          await _firestore.collection('users').doc(mobile).update({'fcmToken': token});
         }
+      } catch (e) {
+        print("Skipping FCM token update: $e");
+      }
+
+      // Expiry Check
+      if (isUnlocked && expiry != null && expiry.toDate().isBefore(DateTime.now())) {
+        isUnlocked = false;
+        await _firestore.collection('users').doc(mobile).update({'isAppUnlocked': false});
+      }
+
+      if (mounted) {
+        if (isUnlocked) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => InterfacePage(userId: mobile),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PaymentPage(userId: mobile, userData: doc.data() as Map<String, dynamic>),
+            ),
+          );
+        }
+        return;
       }
     }
 
@@ -265,7 +268,25 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   final TextEditingController _mobileController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _rememberMe = false;
+  bool _obscurePassword = true;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Error', style: TextStyle(color: Colors.redAccent)),
+        content: Text(message, style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK', style: TextStyle(color: Colors.cyanAccent)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -331,8 +352,15 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   Future<void> _login() async {
     if (_mobileController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter mobile number and password')),
+      _showErrorDialog('Please enter mobile number and password');
+      return;
+    }
+
+    // Admin Check BEFORE database query
+    if (_mobileController.text == '0771246939' && _passwordController.text == 'Admin123@j') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const AdminPanelPage()),
       );
       return;
     }
@@ -351,22 +379,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           await prefs.setBool('rememberMe', false);
         }
 
-        // Admin Check
-        if (_mobileController.text == '0771246939' && _passwordController.text == 'Admin123@j') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const AdminPanelPage()),
-          );
-          return;
-        }
-
         bool isUnlocked = doc.data()?['isAppUnlocked'] == true;
         Timestamp? expiry = doc.data()?['subscriptionExpiry'] as Timestamp?;
         
-        // Store FCM token
-        String? token = await FirebaseMessaging.instance.getToken();
-        if (token != null) {
-          await _firestore.collection('users').doc(_mobileController.text).update({'fcmToken': token});
+        // Store FCM token (Safe fetch)
+        try {
+          String? token = await FirebaseMessaging.instance.getToken();
+          if (token != null) {
+            await _firestore.collection('users').doc(_mobileController.text).update({'fcmToken': token});
+          }
+        } catch (e) {
+          print("Skipping FCM token update: $e");
         }
 
         // Expiry Check
@@ -391,14 +414,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           );
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid mobile number or password')),
-        );
+        _showErrorDialog('Invalid mobile number or password');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      _showErrorDialog('Error: $e');
     }
   }
 
@@ -485,11 +504,15 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   width: MediaQuery.of(context).size.width * 0.8,
                   child: TextField(
                     controller: _passwordController,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: Colors.white,
                       hintText: 'Password',
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -659,9 +682,9 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
   }
 
   Future<String> _uploadImageToCloudinary(File image) async {
-    final url = Uri.parse('https://api.cloudinary.com/v1_1/dstyvdycn/image/upload');
+    final url = Uri.parse('https://api.cloudinary.com/v1_1/dz86er6fe/image/upload');
     final request = http.MultipartRequest('POST', url)
-      ..fields['upload_preset'] = 'flutter_upload_preset'
+      ..fields['upload_preset'] = 'ml_default'
       ..files.add(await http.MultipartFile.fromPath('file', image.path));
 
     final response = await request.send();
