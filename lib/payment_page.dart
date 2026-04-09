@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'interface.dart';
@@ -127,10 +128,20 @@ class _PaymentPageState extends State<PaymentPage> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Upload to Firebase Storage
-      final ref = FirebaseStorage.instance.ref().child('payment_slips/${widget.userId}_${DateTime.now().millisecondsSinceEpoch}');
-      await ref.putFile(_selectedFile!);
-      final downloadUrl = await ref.getDownloadURL();
+      // 1. Upload to Cloudinary (Free & No login needed)
+      final url = Uri.parse('https://api.cloudinary.com/v1_1/dz86er6fe/auto/upload');
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = 'ml_default'
+        ..files.add(await http.MultipartFile.fromPath('file', _selectedFile!.path));
+
+      final response = await request.send();
+      if (response.statusCode != 200) {
+        throw Exception('Cloudinary upload failed with status ${response.statusCode}');
+      }
+
+      final responseData = await response.stream.bytesToString();
+      final jsonResponse = json.decode(responseData);
+      final downloadUrl = jsonResponse['secure_url'];
 
       // 2. Update Firestore
       await FirebaseFirestore.instance.collection('users').doc(widget.userId).update({

@@ -167,7 +167,8 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open file')));
                     }
                   },
-                  child: data['paymentSlipUrl'].toString().toLowerCase().contains('.pdf')
+                  child: (data['paymentSlipUrl'].toString().toLowerCase().contains('.pdf') || 
+                          data['paymentSlipUrl'].toString().toLowerCase().contains('/pdf/'))
                     ? Column(
                         children: [
                           const Icon(Icons.picture_as_pdf, color: Colors.red, size: 80),
