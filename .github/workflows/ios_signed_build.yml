@@ -23,11 +23,13 @@ jobs:
 
       - name: Validate Signing Configuration
         run: |
-          echo "=== Bundle ID from Xcode ==="
-          grep -A1 "PRODUCT_BUNDLE_IDENTIFIER" ios/Runner.xcodeproj/project.pbxproj | tail -1 | sed 's/.*= //' | sed 's/;//'
+          echo "=== Bundle ID Check ==="
+          # Look for the bundle ID specifically in the Release section
+          BUNDLE_ID=$(grep -A5 "Release" ios/Runner.xcodeproj/project.pbxproj | grep "PRODUCT_BUNDLE_IDENTIFIER" | head -1 | sed 's/.*= //' | sed 's/;//' | xargs)
+          echo "Bundle ID for Release: $BUNDLE_ID"
           
           echo "=== Installed Provisioning Profiles ==="
-          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ || echo "Folder not found yet"
           
           echo "=== Available Signing Identities ==="
           security find-identity -v -p codesigning
@@ -35,7 +37,7 @@ jobs:
       - name: Verify Firebase and Signing Configs
         run: |
           if [ ! -f "ios/Runner/GoogleService-Info.plist" ]; then
-            echo "ERROR: GoogleService-Info.plist not found! Make sure it's pushed to GitHub."
+            echo "ERROR: GoogleService-Info.plist not found!"
             exit 1
           fi
           if [ ! -f "ios/ExportOptions.plist" ]; then
