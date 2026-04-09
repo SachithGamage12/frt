@@ -21,6 +21,17 @@ jobs:
           mobileprovision-base64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
+      - name: Validate Signing Configuration
+        run: |
+          echo "=== Bundle ID from Xcode ==="
+          grep -A1 "PRODUCT_BUNDLE_IDENTIFIER" ios/Runner.xcodeproj/project.pbxproj | tail -1 | sed 's/.*= //' | sed 's/;//'
+          
+          echo "=== Installed Provisioning Profiles ==="
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
+          
+          echo "=== Available Signing Identities ==="
+          security find-identity -v -p codesigning
+
       - name: Verify Firebase and Signing Configs
         run: |
           if [ ! -f "ios/Runner/GoogleService-Info.plist" ]; then
@@ -63,9 +74,12 @@ jobs:
           pod install --repo-update
 
       - name: Build IPA (Verbose)
-        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist -v
+        run: |
+          flutter build ipa --release \
+            --export-options-plist=ios/ExportOptions.plist \
+            -v
 
-      - name: Find and Diagnostics (Always runs if Build IPA fails)
+      - name: Find and Diagnostics (Always runs if Build fails)
         if: always()
         run: |
           echo "=== Post-build Diagnostics ==="
