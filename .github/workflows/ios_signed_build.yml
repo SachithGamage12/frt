@@ -88,22 +88,14 @@ jobs:
 
       - name: Step 2 - Archive with Xcode
         run: |
+          set -o pipefail
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
+            -destination 'generic/platform=iOS' \
             -archivePath $RUNNER_TEMP/Runner.xcarchive \
-            -allowProvisioningUpdates \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Development: Sachith Gamage (R5FK77489D)" \
-            PROVISIONING_PROFILE_SPECIFIER="Family Track App" \
-            DEVELOPMENT_TEAM=KMPA36RSLQ \
-            archive \
-            | xcpretty || xcodebuild \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -archivePath $RUNNER_TEMP/Runner.xcarchive \
+            -resultBundlePath $RUNNER_TEMP/ResultBundle \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Development: Sachith Gamage (R5FK77489D)" \
             PROVISIONING_PROFILE_SPECIFIER="Family Track App" \
@@ -131,13 +123,12 @@ jobs:
           echo "=== Export path ==="
           ls -la build/ios/ipa/ 2>/dev/null || echo "No ipa dir"
 
-      - name: Upload Xcode Logs (On Failure)
+      - name: Upload Xcode Result Bundle (On Failure)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: xcode-logs
-          path: |
-            ~/Library/Logs/gym/*.log
+          name: xcode-result-bundle
+          path: ${{ runner.temp }}/ResultBundle
           if-no-files-found: warn
 
       - name: Upload IPA
