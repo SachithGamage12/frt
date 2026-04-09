@@ -21,6 +21,9 @@ jobs:
           mobileprovision-base64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
+      - name: List Installed Provisioning Profiles
+        run: ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
+
       - name: Link Firebase GoogleService-Info to Xcode
         run: |
           gem install xcodeproj

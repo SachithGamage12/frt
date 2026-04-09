@@ -7,14 +7,7 @@
 	<key>teamID</key>
 	<string>KMPA36RSLQ</string>
 	<key>signingStyle</key>
-	<string>manual</string>
-	<key>provisioningProfiles</key>
-	<dict>
-		<key>com.sachith.familytrack.ios</key>
-		<string>Family Track App</string>
-	</dict>
-	<key>signingCertificate</key>
-	<string>Apple Development</string>
+	<string>automatic</string>
 	<key>uploadSymbols</key>
 	<true/>
 	<key>uploadBitcode</key>
