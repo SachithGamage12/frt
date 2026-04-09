@@ -88,24 +88,29 @@ jobs:
 
       - name: Build IPA (Verbose)
         run: |
-          # Redirect output to a log file for easier debugging
           flutter build ipa --release \
             --export-options-plist=ios/ExportOptions.plist \
-            -v > build_output.log 2>&1
+            -v
 
       - name: Find and Diagnostics (Always)
         if: always()
         run: |
           echo "=== Post-build Diagnostics ==="
           find . -name "*.ipa" || echo "No IPA"
-          find build/ios -name "*.app" || echo "No APP"
+          find build/ios -name "*.app" 2>/dev/null || echo "No APP"
+          echo "=== Xcode Logs ==="
+          find ~/Library/Logs/gym -name "*.log" 2>/dev/null | head -5 || echo "No gym logs"
+          find ~/Library/Developer/Xcode/DerivedData -name "*.log" 2>/dev/null | head -5 || echo "No derived data logs"
 
-      - name: Upload Build Log (On Failure)
+      - name: Upload Xcode Logs (On Failure)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-log
-          path: build_output.log
+          name: xcode-logs
+          path: |
+            ~/Library/Logs/gym/*.log
+            ~/Library/Developer/Xcode/DerivedData/**/Logs/**/*.log
+          if-no-files-found: warn
 
       - name: Upload IPA (On Success)
         uses: actions/upload-artifact@v4
