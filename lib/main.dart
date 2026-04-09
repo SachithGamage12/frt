@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -8,10 +9,36 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'interface.dart'; // Adjust path if different
 import 'payment_page.dart';
+import 'admin_panel.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  
+  // Request Notification Permissions
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+  await messaging.requestPermission(
+    alert: true,
+    announcement: false,
+    badge: true,
+    carPlay: false,
+    criticalAlert: false,
+    provisional: false,
+    sound: true,
+  );
+
+  // Get and store the token if logged in
+  String? token = await messaging.getToken();
+  print("FCM Token: $token");
+
+  // Handle Foreground Notifications
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    print('Got a message whilst in the foreground!');
+    if (message.notification != null) {
+      print('Message also contained a notification: ${message.notification?.title}');
+    }
+  });
+
   runApp(const MyApp());
 }
 
@@ -90,7 +117,30 @@ class _FRTAnimationPageState extends State<FRTAnimationPage> with SingleTickerPr
 
       if (doc.exists && doc.data()?['password'] == password) {
         if (mounted) {
-          final isUnlocked = doc.data()?['isAppUnlocked'] == true;
+          // Admin Check
+          if (mobile == '0771246939' && password == 'Admin123@j') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const AdminPanelPage()),
+            );
+            return;
+          }
+
+          bool isUnlocked = doc.data()?['isAppUnlocked'] == true;
+          Timestamp? expiry = doc.data()?['subscriptionExpiry'] as Timestamp?;
+          
+          // Store FCM token
+          String? token = await FirebaseMessaging.instance.getToken();
+          if (token != null) {
+            await _firestore.collection('users').doc(mobile).update({'fcmToken': token});
+          }
+
+          // Expiry Check
+          if (isUnlocked && expiry != null && expiry.toDate().isBefore(DateTime.now())) {
+            isUnlocked = false;
+            await _firestore.collection('users').doc(mobile).update({'isAppUnlocked': false});
+          }
+
           if (isUnlocked) {
             Navigator.pushReplacement(
               context,
@@ -290,7 +340,30 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           await prefs.setBool('rememberMe', false);
         }
 
-        final isUnlocked = doc.data()?['isAppUnlocked'] == true;
+        // Admin Check
+        if (_mobileController.text == '0771246939' && _passwordController.text == 'Admin123@j') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const AdminPanelPage()),
+          );
+          return;
+        }
+
+        bool isUnlocked = doc.data()?['isAppUnlocked'] == true;
+        Timestamp? expiry = doc.data()?['subscriptionExpiry'] as Timestamp?;
+        
+        // Store FCM token
+        String? token = await FirebaseMessaging.instance.getToken();
+        if (token != null) {
+          await _firestore.collection('users').doc(_mobileController.text).update({'fcmToken': token});
+        }
+
+        // Expiry Check
+        if (isUnlocked && expiry != null && expiry.toDate().isBefore(DateTime.now())) {
+          isUnlocked = false;
+          await _firestore.collection('users').doc(_mobileController.text).update({'isAppUnlocked': false});
+        }
+
         if (isUnlocked) {
           Navigator.pushReplacement(
             context,

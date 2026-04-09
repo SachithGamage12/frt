@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.testapp</string>
+	<string>com.sachith.familytrack.ios</string>
 	<key>PROJECT_ID</key>
 	<string>frtapp-ff79b</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1060214465512:ios:7293f58ad571e4d843ba5d</string>
+	<string>1:1060214465512:ios:377eddb6c315792a43ba5d</string>
 </dict>
 </plist>

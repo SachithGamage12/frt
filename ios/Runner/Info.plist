@@ -73,7 +73,6 @@
 	<string>This app requires microphone access for Voice Calls with your contacts.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
-		<string>payhere</string>
 	</array>
 </dict>
 </plist>

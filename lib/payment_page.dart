@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:payhere_mobilesdk_flutter/payhere_mobilesdk_flutter.dart';
-import 'dart:math';
-import 'dart:io' show Platform;
-import 'package:package_info_plus/package_info_plus.dart';
-import 'interface.dart'; // To navigate on success
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
+import 'dart:async';
+import 'interface.dart';
 
 class PaymentPage extends StatefulWidget {
   final String userId;
@@ -19,169 +20,161 @@ class PaymentPage extends StatefulWidget {
 class _PaymentPageState extends State<PaymentPage> {
   final TextEditingController _promoCodeController = TextEditingController();
   bool _isLoading = false;
-  bool _isGatewayOpen = false;
-  String _runtimeBundleId = 'Loading...';
+  File? _selectedFile;
+  String? _fileName;
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+  Timer? _sliderTimer;
+
+  final List<Map<String, String>> _trustInfo = [
+    {
+      'title': 'Real-Time Family Safety',
+      'description': 'Our app provides 99.9% uptime for live tracking, ensuring you always know your loved ones are safe.',
+      'icon': '🛡️'
+    },
+    {
+      'title': 'Trusted by 10,000+ Users',
+      'description': 'We are a registered service in Sri Lanka, committed to providing secure and reliable family tracking.',
+      'icon': '⭐'
+    },
+    {
+      'title': 'Direct Support',
+      'description': 'Any issues? Our team is available 24/7 to assist you. Your trust is our priority.',
+      'icon': '🤝'
+    },
+  ];
 
   @override
   void initState() {
     super.initState();
-    _loadPackageInfo();
+    _startSlider();
   }
 
-  Future<void> _loadPackageInfo() async {
-    final PackageInfo info = await PackageInfo.fromPlatform();
-    if (mounted) {
-      setState(() {
-        _runtimeBundleId = info.packageName;
-      });
-    }
-  }
-
-  String get merchantId {
-    if (Platform.isIOS) {
-      return "1234871";
-    } else {
-      return "1227522";
-    }
-  }
-  
-  String get merchantSecret {
-    if (Platform.isIOS) {
-      return "Mjg3MjU2OTA0Mjc1NzAxNjM3MjMzODE5NzQyMTQ5MDg5MTQ5MDk=";
-    } else {
-      return "MzYxODk5OTE1MTMxMDk2MDE1Nzk0MjA2MTU5NTcwMjg3MjQ4NzI5MQ==";
-    }
-  }
-
-  void _startPayHerePayment() {
-    if (_isGatewayOpen) return;
-    setState(() => _isGatewayOpen = true);
-
-    Map paymentObject = {
-      "sandbox": true,                 // true if using Sandbox Merchant ID
-      "merchant_id": merchantId,       // Gets a Merchant ID from PayHere Account
-      "merchant_secret": merchantSecret, // See step 4e
-      "notify_url": "https://eokc4138h7hjt29.m.pipedream.net", // Needs Pipedream backend listener
-      "order_id": "UnlockApp_${widget.userId}",
-      "items": "FRT App Monthly Premium",
-      "amount": 350.00,
-      "recurrence": "1 Month",
-      "duration": "Forever",
-      "currency": "LKR",
-      "first_name": widget.userData['name'] ?? "User",
-      "last_name": "",
-      "email": widget.userData['email'] ?? "test@test.com",
-      "phone": widget.userData['mobile'] ?? "0771234567",
-      "address": "Sri Lanka",
-      "city": "Colombo",
-      "country": "Sri Lanka",
-      "delivery_address": "Sri Lanka",
-      "delivery_city": "Colombo",
-      "delivery_country": "Sri Lanka",
-      "custom_1": Platform.isIOS ? "ios" : "android",
-      "custom_2": ""
-    };
-
-    PayHere.startPayment(
-      paymentObject, 
-      (paymentId) async {
-        print("One Time Payment Success. Payment Id: $paymentId");
-        setState(() => _isGatewayOpen = false);
-        await _onPaymentSuccess();
-      }, 
-      (error) {
-        print("One Time Payment Failed. Error: $error");
-        setState(() => _isGatewayOpen = false);
-        _showSnackBar("Payment Failed: $error");
-      }, 
-      () {
-        print("One Time Payment Dismissed");
-        setState(() => _isGatewayOpen = false);
-        _showSnackBar("Payment Dismissed.");
+  void _startSlider() {
+    _sliderTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_currentPage < _trustInfo.length - 1) {
+        _currentPage++;
+      } else {
+        _currentPage = 0;
       }
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          _currentPage,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sliderTimer?.cancel();
+    _pageController.dispose();
+    _promoCodeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickFile() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.image),
+              title: const Text('Pick Image (JPG, PNG, JPEG)'),
+              onTap: () async {
+                Navigator.pop(context);
+                final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+                if (picked != null) {
+                  setState(() {
+                    _selectedFile = File(picked.path);
+                    _fileName = picked.name;
+                  });
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf),
+              title: const Text('Pick PDF Document'),
+              onTap: () async {
+                Navigator.pop(context);
+                FilePickerResult? result = await FilePicker.platform.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['pdf'],
+                );
+                if (result != null) {
+                  setState(() {
+                    _selectedFile = File(result.files.single.path!);
+                    _fileName = result.files.single.name;
+                  });
+                }
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Future<void> _onPaymentSuccess() async {
-    setState(() {
-      _isLoading = true;
-    });
-    try {
-      // 1. Generate 6 alphanumeric code
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      Random rnd = Random();
-      String code = String.fromCharCodes(Iterable.generate(
-        6, (_) => chars.codeUnitAt(rnd.nextInt(chars.length))));
-
-      // 2. Save it to current user's doc
-      await FirebaseFirestore.instance.collection('users').doc(widget.userId).update({
-        'isAppUnlocked': true,
-        'generatedPromoCode': code,
-        'isPromoCodeUsed': false,
-      });
-
-      // 3. Show dialog
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (mounted) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text("App Unlocked Successfully!", style: TextStyle(color: Colors.black)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text("Thank you for your purchase. Here is your FREE connection code to give to 1 person:"),
-                const SizedBox(height: 20),
-                SelectableText(
-                  code,
-                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.blueAccent),
-                ),
-                const SizedBox(height: 10),
-                const Text("You can find this code later in your Profile.", style: TextStyle(fontSize: 12, color: Colors.grey)),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context); // close dialog
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => InterfacePage(userId: widget.userId)),
-                  );
-                },
-                child: const Text("Continue to App", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              )
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      _showSnackBar("Error updating status: $e");
-    }
-  }
-
-  Future<void> _submitPromoCode() async {
-    String code = _promoCodeController.text.trim().toUpperCase();
-    if (code.isEmpty) {
-      _showSnackBar("Please enter a valid connection code.");
+  Future<void> _submitPayment() async {
+    if (_selectedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please upload your payment slip')));
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      // Find the user who owns this code
+      // 1. Upload to Firebase Storage
+      final ref = FirebaseStorage.instance.ref().child('payment_slips/${widget.userId}_${DateTime.now().millisecondsSinceEpoch}');
+      await ref.putFile(_selectedFile!);
+      final downloadUrl = await ref.getDownloadURL();
+
+      // 2. Update Firestore
+      await FirebaseFirestore.instance.collection('users').doc(widget.userId).update({
+        'paymentStatus': 'pending',
+        'paymentSlipUrl': downloadUrl,
+        'paymentTimestamp': FieldValue.serverTimestamp(),
+      });
+
+      setState(() => _isLoading = false);
+      _showSuccessDialog();
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+    }
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Slip Submitted!', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Your payment slip has been sent for admin review. You will receive a notification once your account is activated.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          )
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submitPromoCode() async {
+     String code = _promoCodeController.text.trim().toUpperCase();
+    if (code.isEmpty) return;
+
+    setState(() => _isLoading = true);
+
+    try {
       QuerySnapshot query = await FirebaseFirestore.instance
           .collection('users')
           .where('generatedPromoCode', isEqualTo: code)
@@ -189,190 +182,219 @@ class _PaymentPageState extends State<PaymentPage> {
           .get();
 
       if (query.docs.isEmpty) {
-        _showSnackBar("Invalid Connection Code. Try again.");
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid Code')));
         setState(() => _isLoading = false);
         return;
       }
 
-      DocumentSnapshot codeOwnerDoc = query.docs.first;
-      Map<String, dynamic> ownerData = codeOwnerDoc.data() as Map<String, dynamic>;
-
-      if (ownerData['isPromoCodeUsed'] == true) {
-        _showSnackBar("This Connection Code has already been used by someone else.");
+      DocumentSnapshot owner = query.docs.first;
+      if (owner.get('isPromoCodeUsed') == true) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code already used')));
         setState(() => _isLoading = false);
         return;
       }
 
-      // Mark code as used on the owner
-      await FirebaseFirestore.instance.collection('users').doc(codeOwnerDoc.id).update({
-        'isPromoCodeUsed': true,
-      });
-
-      // Mark current user as unlocked
+      // Mark used and unlock with 30-day expiry
+      await FirebaseFirestore.instance.collection('users').doc(owner.id).update({'isPromoCodeUsed': true});
       await FirebaseFirestore.instance.collection('users').doc(widget.userId).update({
         'isAppUnlocked': true,
+        'subscriptionExpiry': Timestamp.fromDate(DateTime.now().add(const Duration(days: 30))),
       });
 
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Promo Code Applied! Unlocked successfully.")));
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => InterfacePage(userId: widget.userId)),
-        );
-      }
+      setState(() => _isLoading = false);
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => InterfacePage(userId: widget.userId)));
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      _showSnackBar("Error applying promo code: $e");
-    }
-  }
-
-  void _showSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // Premium Dark Mode Background
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+      backgroundColor: const Color(0xFF0F2027),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              _buildTrustSlider(),
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    _buildBankCard(),
+                    const SizedBox(height: 30),
+                    _buildUploadSection(),
+                    const SizedBox(height: 40),
+                    const Text("--- OR ---", style: TextStyle(color: Colors.white38)),
+                    const SizedBox(height: 30),
+                    _buildPromoSection(),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-          
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrustSlider() {
+    return Container(
+      height: 200,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        border: Border(bottom: BorderSide(color: Colors.white10)),
+      ),
+      child: PageView.builder(
+        controller: _pageController,
+        onPageChanged: (index) => setState(() => _currentPage = index),
+        itemCount: _trustInfo.length,
+        itemBuilder: (context, index) {
+          final info = _trustInfo[index];
+          return Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(info['icon']!, style: const TextStyle(fontSize: 40)),
+                const SizedBox(height: 12),
+                Text(info['title']!, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text(info['description']!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 14)),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBankCard() {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance.collection('settings').doc('bankDetails').get(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() as Map<String, dynamic>? ?? {
+          'name': 'Janitha prabath',
+          'bank': 'Sampath bank wadduwa',
+          'accountNumber': '102657098398'
+        };
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [Colors.blueGrey.shade800, Colors.black]),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [BoxShadow(color: Colors.cyanAccent.withOpacity(0.1), blurRadius: 20)],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(Icons.lock_outline, size: 80, color: Colors.white70),
-                  const SizedBox(height: 20),
-                  const Text(
-                    "Unlock Family Road Track",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    "Connect with your family members and track them using live tracking. Enhance your app experience by unlocking premium features.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16, color: Colors.white70),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // PayHere Box (Glassmorphism effect)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.white.withOpacity(0.2)),
-                    ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          "LKR 350 / Month",
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          "Includes 1 Free Connection Code to share with a partner or family member.",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 14, color: Colors.white70),
-                        ),
-                        const SizedBox(height: 20),
-                        _isLoading 
-                          ? const CircularProgressIndicator(color: Colors.cyanAccent)
-                          : ElevatedButton(
-                              onPressed: _startPayHerePayment,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.cyanAccent.shade700,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                elevation: 8,
-                              ),
-                              child: const Text("Subscribe via PayHere", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                            ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-                  const Text("OR", style: TextStyle(color: Colors.white54, fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 30),
-
-                  const SizedBox(height: 30),
-                  Text("PayHere Domain: $_runtimeBundleId", style: const TextStyle(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-
-                  // Promo Code Box
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.white.withOpacity(0.2)),
-                    ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          "Have a Connection Code?",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _promoCodeController,
-                          style: const TextStyle(color: Colors.white, letterSpacing: 2.0, fontWeight: FontWeight.bold),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.black26,
-                            hintText: "Enter 6-digit Code",
-                            hintStyle: const TextStyle(color: Colors.white54, letterSpacing: 1.0, fontWeight: FontWeight.normal),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide.none,
-                            ),
-                            prefixIcon: const Icon(Icons.vpn_key_outlined, color: Colors.cyanAccent),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _isLoading 
-                          ? const CircularProgressIndicator(color: Colors.cyanAccent)
-                          : ElevatedButton(
-                              onPressed: _submitPromoCode,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                foregroundColor: Colors.cyanAccent,
-                                side: const BorderSide(color: Colors.cyanAccent, width: 2),
-                                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              ),
-                              child: const Text("Unlock for Free", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                            ),
-                      ],
-                    ),
-                  ),
+                  Text("MONTHLY SUBSCRIPTION", style: TextStyle(color: Colors.cyanAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text("LKR 350", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 ],
               ),
+              const Divider(color: Colors.white10, height: 30),
+              _bankDetailRow("Account Name", data['name']),
+              const SizedBox(height: 12),
+              _bankDetailRow("Bank/Branch", data['bank']),
+              const SizedBox(height: 12),
+              _bankDetailRow("Account Number", data['accountNumber']),
+              const SizedBox(height: 20),
+              const Text(
+                "Note: Please transfer the exact amount and upload the receipt below.",
+                style: TextStyle(color: Colors.orangeAccent, fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _bankDetailRow(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500)),
+      ],
+    );
+  }
+
+  Widget _buildUploadSection() {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: _pickFile,
+          child: Container(
+            width: double.infinity,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white24, style: BorderStyle.solid),
             ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.cloud_upload_outlined, color: Colors.white54, size: 40),
+                const SizedBox(height: 8),
+                Text(_fileName ?? 'Tap to select Payment Slip', style: const TextStyle(color: Colors.white70)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          height: 55,
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _submitPayment,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.cyanAccent.shade700,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: _isLoading 
+              ? const CircularProgressIndicator(color: Colors.white)
+              : const Text("Submit for Review", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPromoSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          const Text("Activate with Connection Code", style: TextStyle(color: Colors.white70)),
+          const SizedBox(height: 15),
+          TextField(
+            controller: _promoCodeController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: "Enter 6-digit Code",
+              hintStyle: const TextStyle(color: Colors.white24),
+              filled: true,
+              fillColor: Colors.black26,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 15),
+          TextButton(
+            onPressed: _isLoading ? null : _submitPromoCode,
+            child: const Text("Apply Code", style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
