@@ -37,17 +37,24 @@ jobs:
           # import certificate to keychain
           security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
           
-          # Fix for "codesign" tool permission (CRITICAL for CI)
+          # Fix for "codesign" tool permission
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
           # apply provisioning profile
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+          
+          # Verify provisioning profile UUID (as suggested)
+          PROFILE_UUID=$(security cms -D -i $PP_PATH | grep -A 1 "UUID" | tail -1 | sed 's/.*<string>//;s/<\/string>.*//')
+          echo "Provisioning profile UUID: $PROFILE_UUID"
 
           # Set keychain as default and prioritize it
           security list-keychains -d user -s $KEYCHAIN_PATH
           security default-keychain -s $KEYCHAIN_PATH
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          
+          # Verify certificate is in keychain (as suggested)
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
           
       - name: Link Firebase GoogleService-Info to Xcode
         run: |
