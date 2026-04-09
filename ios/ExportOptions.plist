@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>method</key>
-	<string>development</string>
+	<string>debugging</string>
 	<key>teamID</key>
 	<string>KMPA36RSLQ</string>
 	<key>signingStyle</key>
@@ -11,14 +11,12 @@
 	<key>provisioningProfiles</key>
 	<dict>
 		<key>com.sachith.familytrack.ios</key>
-		<string>Family Track App</string>
+		<string>27d3e550-7928-448f-9fd1-0b20fc6e1c78</string>
 	</dict>
 	<key>signingCertificate</key>
 	<string>Apple Development: Sachith Gamage (R5FK77489D)</string>
 	<key>uploadSymbols</key>
 	<true/>
-	<key>uploadBitcode</key>
-	<false/>
 	<key>compileBitcode</key>
 	<false/>
 	<key>thinning</key>
