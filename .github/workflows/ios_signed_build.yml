@@ -100,7 +100,10 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Development: Sachith Gamage (R5FK77489D)" \
             PROVISIONING_PROFILE_SPECIFIER="Family Track App" \
             DEVELOPMENT_TEAM=KMPA36RSLQ \
-            archive
+            archive 2>&1 | tee $RUNNER_TEMP/xcodebuild.log
+          echo ""
+          echo "=== KEY ERRORS FROM BUILD ==="
+          grep -E "^(error:|warning: .*(error|failed)|.*FAILED)" $RUNNER_TEMP/xcodebuild.log | head -30 || echo "No explicit errors found in filter"
 
       - name: Step 3 - Export IPA from Archive
         run: |
@@ -128,7 +131,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: xcode-result-bundle
-          path: ${{ runner.temp }}/ResultBundle
+          path: |
+            ${{ runner.temp }}/ResultBundle
+            ${{ runner.temp }}/xcodebuild.log
           if-no-files-found: warn
 
       - name: Upload IPA
