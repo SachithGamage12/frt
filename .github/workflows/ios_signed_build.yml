@@ -37,8 +37,8 @@ jobs:
           echo -n "$PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
           UUID=$(security cms -D -i $PP_PATH | grep -A 1 "UUID" | tail -1 | sed 's/.*<string>//;s/<\/string>.*//')
           echo "Profile UUID extracted: $UUID"
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PP_PATH "~/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp $PP_PATH "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
           
       - name: Validate Configuration (Debug)
         run: |
