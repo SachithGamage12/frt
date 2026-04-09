@@ -14,7 +14,7 @@
 		<string>Family Track App</string>
 	</dict>
 	<key>signingCertificate</key>
-	<string>Apple Development</string>
+	<string>Apple Development: Sachith Gamage (R5FK77489D)</string>
 	<key>uploadSymbols</key>
 	<true/>
 	<key>uploadBitcode</key>

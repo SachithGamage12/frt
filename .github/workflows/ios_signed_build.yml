@@ -47,7 +47,7 @@ jobs:
           echo "=== Identities ==="
           security find-identity -v -p codesigning
           echo "=== Profiles ==="
-          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/"
 
       - name: Verify Firebase Config
         run: |
@@ -88,17 +88,26 @@ jobs:
 
       - name: Build IPA (Verbose)
         run: |
+          # Redirect output to a log file for easier debugging
           flutter build ipa --release \
             --export-options-plist=ios/ExportOptions.plist \
-            -v
+            -v > build_output.log 2>&1
 
-      - name: Post-build Diagnostics
+      - name: Find and Diagnostics (Always)
         if: always()
         run: |
+          echo "=== Post-build Diagnostics ==="
           find . -name "*.ipa" || echo "No IPA"
           find build/ios -name "*.app" || echo "No APP"
 
-      - name: Upload IPA
+      - name: Upload Build Log (On Failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build_output.log
+
+      - name: Upload IPA (On Success)
         uses: actions/upload-artifact@v4
         with:
           name: release-ipa
