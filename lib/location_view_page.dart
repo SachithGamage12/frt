@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'style_utils.dart';
 
 class LocationViewPage extends StatefulWidget {
   final double latitude;
@@ -121,10 +122,10 @@ class _LocationViewPageState extends State<LocationViewPage> {
           Circle(
             circleId: const CircleId('liveIndicator'),
             center: position,
-            radius: 10,
-            fillColor: Colors.purple.withOpacity(0.3),
-            strokeColor: Colors.purple,
-            strokeWidth: 1,
+            radius: 12,
+            fillColor: AppColors.primary.withOpacity(0.2),
+            strokeColor: AppColors.primary,
+            strokeWidth: 2,
             zIndex: 1,
           ),
         );
@@ -160,8 +161,8 @@ class _LocationViewPageState extends State<LocationViewPage> {
           Polyline(
             polylineId: const PolylineId('userPath'),
             points: _pathPoints,
-            color: Colors.purple, // Changed to purple
-            width: 6,
+            color: AppColors.primary.withOpacity(0.8),
+            width: 8,
             startCap: Cap.roundCap,
             endCap: Cap.roundCap,
             jointType: JointType.round,
@@ -261,7 +262,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
         });
       }
     }, onError: (e) {
-      print('Firestore listener error: $e');
+      debugPrint('Firestore listener error: $e');
       setState(() {
         _isLocationAvailable = false;
       });
@@ -271,34 +272,52 @@ class _LocationViewPageState extends State<LocationViewPage> {
   void _showUserProfile() {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          border: Border.all(color: Colors.white10),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (widget.profilePicture != null)
               CircleAvatar(
                 backgroundImage: NetworkImage(widget.profilePicture!),
-                radius: 40,
+                radius: 45,
+                backgroundColor: Colors.white10,
               ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Text(
-              widget.userName,
+              widget.userName.toUpperCase(),
               style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 1.2,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              _isLocationAvailable
-                  ? (widget.isLive ? 'Sharing live location' : 'Location shared')
-                  : 'Location unavailable',
-              style: TextStyle(
-                color: _isLocationAvailable ? Colors.grey[600] : Colors.red,
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isLocationAvailable ? AppColors.primary.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                _isLocationAvailable
+                    ? (widget.isLive ? 'LIVE TRACKING ACTIVE' : 'LOCATION SYNCED')
+                    : 'SIGNAL LOST',
+                style: TextStyle(
+                  color: _isLocationAvailable ? AppColors.primary : Colors.redAccent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -310,14 +329,15 @@ class _LocationViewPageState extends State<LocationViewPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Tracking ${widget.userName}',
+          widget.userName,
           style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: Colors.black,
           ),
         ),
-        backgroundColor: Colors.white,
-        elevation: 1,
+        backgroundColor: AppColors.primary,
+        elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           if (widget.profilePicture != null)
@@ -380,13 +400,11 @@ class _LocationViewPageState extends State<LocationViewPage> {
             ),
           Positioned(
             right: 16,
-            bottom: 100,
+            bottom: 120,
             child: Column(
               children: [
-                FloatingActionButton(
-                  heroTag: 'center',
-                  mini: true,
-                  backgroundColor: Colors.white,
+                _buildMapFab(
+                  icon: Icons.gps_fixed,
                   onPressed: () {
                     if (_markers.isNotEmpty) {
                       _mapController.animateCamera(
@@ -401,88 +419,77 @@ class _LocationViewPageState extends State<LocationViewPage> {
                       );
                     }
                   },
-                  child: const Icon(Icons.gps_fixed, size: 20, color: Colors.black),
                 ),
-                const SizedBox(height: 8),
-                FloatingActionButton(
-                  heroTag: 'zoomIn',
-                  mini: true,
-                  backgroundColor: Colors.white,
-                  onPressed: () {
-                    _mapController.animateCamera(CameraUpdate.zoomIn());
-                  },
-                  child: const Icon(Icons.add, size: 20, color: Colors.black),
+                const SizedBox(height: 12),
+                _buildMapFab(
+                  icon: Icons.add,
+                  onPressed: () => _mapController.animateCamera(CameraUpdate.zoomIn()),
                 ),
-                const SizedBox(height: 8),
-                FloatingActionButton(
-                  heroTag: 'zoomOut',
-                  mini: true,
-                  backgroundColor: Colors.white,
-                  onPressed: () {
-                    _mapController.animateCamera(CameraUpdate.zoomOut());
-                  },
-                  child: const Icon(Icons.remove, size: 20, color: Colors.black),
+                const SizedBox(height: 12),
+                _buildMapFab(
+                  icon: Icons.remove,
+                  onPressed: () => _mapController.animateCamera(CameraUpdate.zoomOut()),
                 ),
               ],
             ),
           ),
           Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
+            bottom: 20,
+            left: 20,
+            right: 20,
             child: GestureDetector(
               onTap: _showUserProfile,
               child: Container(
-                height: 80,
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  color: AppColors.surface.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white10),
                   boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, -2),
-                    ),
+                    BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5)),
                   ],
                 ),
-                padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
                     if (widget.profilePicture != null)
                       CircleAvatar(
                         backgroundImage: NetworkImage(widget.profilePicture!),
-                        radius: 20,
+                        radius: 24,
+                        backgroundColor: Colors.white10,
                       ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             widget.userName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
                           ),
-                          Text(
-                            _isLocationAvailable
-                                ? (widget.isLive ? 'Live location sharing' : 'Location shared')
-                                : 'Location unavailable',
-                            style: TextStyle(
-                              color: _isLocationAvailable ? Colors.grey[600] : Colors.red,
-                              fontSize: 14,
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: _isLocationAvailable ? AppColors.primary : Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _isLocationAvailable
+                                    ? (widget.isLive ? 'Live Tracking' : 'Last Seen')
+                                    : 'Offline',
+                                style: const TextStyle(color: Colors.white54, fontSize: 13),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    Icon(
-                      _isLocationAvailable
-                          ? (widget.isLive ? Icons.location_on : Icons.location_history)
-                          : Icons.location_off,
-                      color: _isLocationAvailable ? Colors.blue : Colors.red,
-                    ),
+                    const Icon(Icons.expand_less, color: Colors.white24),
                   ],
                 ),
               ),
@@ -490,6 +497,17 @@ class _LocationViewPageState extends State<LocationViewPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMapFab({required IconData icon, required VoidCallback onPressed}) {
+    return FloatingActionButton(
+      heroTag: null,
+      mini: true,
+      backgroundColor: AppColors.surface,
+      elevation: 4,
+      onPressed: onPressed,
+      child: Icon(icon, color: AppColors.primary, size: 20),
     );
   }
 

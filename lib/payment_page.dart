@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'interface.dart';
 import 'main.dart';
+import 'style_utils.dart';
 
 class PaymentPage extends StatefulWidget {
   final String userId;
@@ -30,20 +31,7 @@ class _PaymentPageState extends State<PaymentPage> {
   Timer? _sliderTimer;
 
   void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Error', style: TextStyle(color: Colors.redAccent)),
-        content: Text(message, style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK', style: TextStyle(color: Colors.cyanAccent)),
-          ),
-        ],
-      ),
-    );
+    AppAlerts.show(context, message, isError: true);
   }
 
   Future<void> _logout() async {
@@ -182,32 +170,11 @@ class _PaymentPageState extends State<PaymentPage> {
       });
 
       setState(() => _isLoading = false);
-      _showSuccessDialog();
+      AppAlerts.show(context, 'Your payment slip has been sent for admin review. You will receive a notification once your account is activated.');
     } catch (e) {
       setState(() => _isLoading = false);
       _showErrorDialog('Upload failed: $e');
     }
-  }
-
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Slip Submitted!', style: TextStyle(color: Colors.white)),
-        content: const Text(
-          'Your payment slip has been sent for admin review. You will receive a notification once your account is activated.',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          )
-        ],
-      ),
-    );
   }
 
   Future<void> _submitPromoCode() async {
@@ -254,7 +221,7 @@ class _PaymentPageState extends State<PaymentPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F2027),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -339,9 +306,9 @@ class _PaymentPageState extends State<PaymentPage> {
           width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [Colors.blueGrey.shade800, Colors.black]),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.cyanAccent.withOpacity(0.1), blurRadius: 20)],
+            gradient: const LinearGradient(colors: [Color(0xFF1E3C72), Color(0xFF2A5298)]),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.1), blurRadius: 20)],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -349,7 +316,7 @@ class _PaymentPageState extends State<PaymentPage> {
               const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("MONTHLY SUBSCRIPTION", style: TextStyle(color: Colors.cyanAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text("MONTHLY SUBSCRIPTION", style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
                   Text("LKR 350", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 ],
               ),
@@ -411,12 +378,13 @@ class _PaymentPageState extends State<PaymentPage> {
           child: ElevatedButton(
             onPressed: _isLoading ? null : _submitPayment,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.cyanAccent.shade700,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
             child: _isLoading 
-              ? const CircularProgressIndicator(color: Colors.white)
-              : const Text("Submit for Review", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              ? const CircularProgressIndicator(color: Colors.black)
+              : const Text("Submit for Review", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ),
       ],

@@ -9,6 +9,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'user_details_page.dart';
 import 'location_view_page.dart';
 import 'call_page.dart';
+import 'style_utils.dart';
 
 class InterfacePage extends StatefulWidget {
   final String userId;
@@ -212,9 +213,7 @@ class _InterfacePageState extends State<InterfacePage>
           _isLoading = false;
         });
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('User not found')));
+          AppAlerts.show(context, 'User not found', isError: true);
         }
       }
     } catch (e) {
@@ -222,9 +221,7 @@ class _InterfacePageState extends State<InterfacePage>
         _isLoading = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error fetching user data: $e')));
+        AppAlerts.show(context, 'Error fetching user data: $e', isError: true);
       }
     }
   }
@@ -857,34 +854,21 @@ class _InterfacePageState extends State<InterfacePage>
     }
   }
 
-  Future<void> _removeFamilyMember(String memberId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .collection('familyMembers')
-          .doc(memberId)
-          .delete();
-
-      await _loadFamilyMembers();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error removing family member: $e')),
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Family Road Track App',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          'FRT Tracking Hub',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
         ),
-        backgroundColor: Colors.yellowAccent[700],
+        centerTitle: true,
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        ),
         actions: [
           if (_userData != null && _userData!['profilePicture'] != null)
             IconButton(
@@ -905,84 +889,47 @@ class _InterfacePageState extends State<InterfacePage>
           else
             Column(
               children: [
+                // Active Sharing Status Bar
+                if (_isSharingLiveLocation)
+                  _buildLiveStatusBar(),
+                
+                const SizedBox(height: 10),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  child: Row(
+                    children: [
+                      Text(
+                        "Tracked Circles",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      Spacer(),
+                      Icon(Icons.people_outline, color: AppColors.primary),
+                    ],
+                  ),
+                ),
                 if (_familyMembers.isNotEmpty)
                   Expanded(
                     child: ListView.builder(
                       itemCount: _familyMembers.length,
                       itemBuilder: (context, index) {
                         final member = _familyMembers[index];
-                        return Dismissible(
-                          key: Key(
-                            member['id'] ??
-                                member['userId'] ??
-                                index.toString(),
-                          ),
-                          background: Container(
-                            color: Colors.red,
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20),
-                            child: const Icon(
-                              Icons.delete,
-                              color: Colors.white,
-                            ),
-                          ),
-                          direction: DismissDirection.endToStart,
-                          onDismissed: (direction) {
-                            _removeFamilyMember(member['id']);
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                              vertical: 8.0,
-                            ),
-                            child: Card(
-                              elevation: 2,
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundImage: NetworkImage(
-                                    member['profilePicture'] ?? '',
-                                  ),
-                                  radius: 25,
-                                ),
-                                title: Text(member['name'] ?? 'Unknown'),
-                                subtitle: const Text('Tap to view location'),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.call, color: Colors.green),
-                                      onPressed: () {
-                                        _initiateCall(
-                                          member['userId'], 
-                                          member['name'] ?? 'Unknown'
-                                        );
-                                      },
-                                    ),
-                                    const Icon(Icons.chevron_right),
-                                  ],
-                                ),
-                                onTap: () {
-                                  if (member['locationData'] != null) {
-                                    _navigateToLocationView(
-                                      member['locationData'],
-                                      member['name'] ?? 'Unknown',
-                                      member['profilePicture'],
-                                    );
-                                  }
-                                },
-                              ),
-                            ),
-                          ),
-                        );
+                        return _buildFamilyMemberCard(member, index);
                       },
                     ),
                   )
                 else
                   const Expanded(
                     child: Center(
-                      child: Text(
-                        'Scan QR codes to add family members',
-                        style: TextStyle(fontSize: 16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.qr_code_2, size: 80, color: Colors.white24),
+                          SizedBox(height: 16),
+                          Text(
+                            'Scan QR codes to add family members',
+                            style: TextStyle(fontSize: 16, color: Colors.white54),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1156,6 +1103,114 @@ class _InterfacePageState extends State<InterfacePage>
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLiveStatusBar() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.satellite_alt, color: AppColors.primary),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Sharing Live Location",
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  "Background tracking active",
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: () => setState(() => _showPopup = true),
+            icon: const Icon(Icons.qr_code, size: 18, color: AppColors.primary),
+            label: const Text("Show QR", style: TextStyle(color: AppColors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFamilyMemberCard(Map<String, dynamic> member, int index) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Stack(
+          children: [
+            CircleAvatar(
+              backgroundImage: NetworkImage(member['profilePicture'] ?? ''),
+              radius: 28,
+              backgroundColor: Colors.white10,
+            ),
+            Positioned(
+              right: 2,
+              bottom: 2,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.background, width: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
+        title: Text(
+          member['name'] ?? 'Unknown',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        subtitle: const Text(
+          'Connected • Tap to track',
+          style: TextStyle(color: Colors.white54, fontSize: 12),
+        ),
+        trailing: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.call, color: AppColors.primary, size: 20),
+            onPressed: () => _initiateCall(member['userId'], member['name'] ?? 'Unknown'),
+          ),
+        ),
+        onTap: () {
+          if (member['locationData'] != null) {
+            _navigateToLocationView(
+              member['locationData'],
+              member['name'] ?? 'Unknown',
+              member['profilePicture'],
+            );
+          }
+        },
       ),
     );
   }

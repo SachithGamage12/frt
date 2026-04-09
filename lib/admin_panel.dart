@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'style_utils.dart';
 
 class AdminPanelPage extends StatefulWidget {
   const AdminPanelPage({super.key});
@@ -17,7 +18,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -36,11 +37,12 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.blueAccent,
+          indicatorColor: AppColors.primary,
           tabs: const [
-            Tab(icon: Icon(Icons.dashboard), text: 'Dashboard'),
+            Tab(icon: Icon(Icons.dashboard), text: 'Stats'),
             Tab(icon: Icon(Icons.pending_actions), text: 'Approvals'),
-            Tab(icon: Icon(Icons.settings), text: 'Bank Settings'),
+            Tab(icon: Icon(Icons.feedback_outlined), text: 'Cancellations'),
+            Tab(icon: Icon(Icons.settings), text: 'Bank'),
           ],
         ),
       ),
@@ -49,6 +51,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
         children: [
           _buildDashboard(),
           _buildApprovalsList(),
+          _buildCancellationsList(),
           _buildBankSettings(),
         ],
       ),
@@ -73,19 +76,27 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
           return data['paymentStatus'] == 'pending';
         }).length;
 
-        double totalRevenue = activeSubscribers * 350.0; // Simplistic calculation
+        double totalRevenue = activeSubscribers * 350.0;
 
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: GridView.count(
-            crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildStatCard('Total Users', totalUsers.toString(), Colors.blue),
-              _buildStatCard('Active Subs', activeSubscribers.toString(), Colors.green),
-              _buildStatCard('Pending', pendingApprovals.toString(), Colors.orange),
-              _buildStatCard('Revenue (LKR)', totalRevenue.toStringAsFixed(0), Colors.purple),
+              const Text(
+                "Platform Overview",
+                style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              _buildModernMetricRow(
+                'Total Users', totalUsers.toString(), Icons.people, Colors.blue,
+                'Active Subs', activeSubscribers.toString(), Icons.check_circle, Colors.green,
+              ),
+              const SizedBox(height: 16),
+              _buildModernMetricRow(
+                'Pending', pendingApprovals.toString(), Icons.hourglass_empty, Colors.orange,
+                'Revenue', 'LKR ${totalRevenue.toStringAsFixed(0)}', Icons.payments, Colors.purple,
+              ),
             ],
           ),
         );
@@ -93,20 +104,37 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
     );
   }
 
-  Widget _buildStatCard(String title, String value, Color color) {
+  Widget _buildModernMetricRow(String t1, String v1, IconData i1, Color c1, String t2, String v2, IconData i2, Color c2) {
+    return Row(
+      children: [
+        Expanded(child: _buildModernStatCard(t1, v1, i1, c1)),
+        const SizedBox(width: 16),
+        Expanded(child: _buildModernStatCard(t2, v2, i2, c2)),
+      ],
+    );
+  }
+
+  Widget _buildModernStatCard(String title, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.5)),
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: color.withOpacity(0.2)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [color.withOpacity(0.1), Colors.transparent],
+        ),
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 8),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 16),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(title, style: TextStyle(color: color.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w500)),
         ],
       ),
     );
@@ -164,7 +192,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
                   onTap: () async {
                     final Uri url = Uri.parse(data['paymentSlipUrl']);
                     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open file')));
+                      AppAlerts.show(context, 'Could not open file', isError: true);
                     }
                   },
                   child: (data['paymentSlipUrl'].toString().toLowerCase().contains('.pdf') || 
@@ -215,16 +243,64 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
           'approvalDate': FieldValue.serverTimestamp(),
         });
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account Approved! Notification Sent.')));
-        // TODO: Trigger FCM Notification
+        AppAlerts.show(context, 'Account Approved! Notification Sent.');
       } else {
         await _firestore.collection('users').doc(userId).update({
           'paymentStatus': 'rejected',
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account Rejected.')));
+        AppAlerts.show(context, 'Account Rejected.');
       }
     } catch (e) {
-       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      AppAlerts.show(context, 'Error: $e', isError: true);
     }
+  }
+
+  Widget _buildCancellationsList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('cancellations').orderBy('timestamp', descending: true).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text('No cancellation records', style: TextStyle(color: Colors.white70)));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: snapshot.data!.docs.length,
+          itemBuilder: (context, index) {
+            var doc = snapshot.data!.docs[index];
+            var data = doc.data() as Map<String, dynamic>;
+            DateTime? ts = (data['timestamp'] as Timestamp?)?.toDate();
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.redAccent.withOpacity(0.1)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(data['email'] ?? 'Unknown User', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      if (ts != null) Text(DateFormat('MMM dd, yr').format(ts), style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text("Reason for leaving:", style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(data['reason'] ?? 'No reason provided', style: const TextStyle(color: Colors.white70, fontStyle: FontStyle.italic)),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildBankSettings() {
@@ -266,7 +342,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
                       'accountNumber': accCtrl.text,
                       'updatedAt': FieldValue.serverTimestamp(),
                     });
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Settings Updated!')));
+                    AppAlerts.show(context, 'Settings Updated!');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blueAccent,

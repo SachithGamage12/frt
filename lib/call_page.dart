@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'style_utils.dart';
 
 class CallPage extends StatefulWidget {
   final String channelName;
@@ -122,51 +123,63 @@ class _CallPageState extends State<CallPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F2027),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
             const Spacer(),
             const CircleAvatar(
-              radius: 60,
-              backgroundColor: Colors.white24,
-              child: Icon(Icons.person, size: 80, color: Colors.white),
+              radius: 70,
+              backgroundColor: Colors.white10,
+              child: Icon(Icons.person, size: 90, color: Colors.white24),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 40),
             Text(
-              _remoteUid != null ? "Connected" : "Calling...",
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+              _remoteUid != null ? "CONNECTED" : "CALLING...",
+              style: TextStyle(
+                fontSize: 28, 
+                fontWeight: FontWeight.w900, 
+                color: Colors.white,
+                letterSpacing: 2.0,
+                shadows: [
+                  Shadow(color: AppColors.primary.withOpacity(0.5), blurRadius: 10),
+                ],
+              ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Text(
-              "Channel: ${widget.channelName}",
-              style: const TextStyle(fontSize: 14, color: Colors.white54),
+              "Session: ${widget.channelName}",
+              style: const TextStyle(fontSize: 14, color: Colors.white38, letterSpacing: 1.2),
             ),
             const Spacer(),
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 30),
-              decoration: const BoxDecoration(
-                color: Color(0xFF203A43),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+                border: Border.all(color: Colors.white10),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _buildCallButton(
                     icon: _isMuted ? Icons.mic_off : Icons.mic,
-                    color: _isMuted ? Colors.redAccent : Colors.white,
+                    color: _isMuted ? Colors.redAccent : Colors.white70,
+                    active: !_isMuted,
                     onTap: _onToggleMute,
                   ),
                   _buildCallButton(
                     icon: Icons.call_end,
                     color: Colors.red,
-                    size: 70,
-                    iconSize: 35,
+                    size: 80,
+                    iconSize: 40,
                     onTap: _leaveChannel,
+                    isEndCall: true,
                   ),
                   _buildCallButton(
                     icon: _isSpeakerOn ? Icons.volume_up : Icons.volume_down,
-                    color: _isSpeakerOn ? Colors.greenAccent : Colors.white,
+                    color: _isSpeakerOn ? AppColors.primary : Colors.white70,
+                    active: _isSpeakerOn,
                     onTap: _onToggleSpeaker,
                   ),
                 ],
@@ -184,6 +197,8 @@ class _CallPageState extends State<CallPage> {
     required VoidCallback onTap,
     double size = 60,
     double iconSize = 30,
+    bool active = false,
+    bool isEndCall = false,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -191,10 +206,16 @@ class _CallPageState extends State<CallPage> {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
+          color: isEndCall 
+              ? color.withOpacity(0.3) 
+              : (active ? color.withOpacity(0.2) : Colors.white10),
           shape: BoxShape.circle,
+          border: Border.all(
+            color: isEndCall ? color.withOpacity(0.5) : (active ? color.withOpacity(0.4) : Colors.transparent),
+            width: 2,
+          ),
         ),
-        child: Icon(icon, color: color, size: iconSize),
+        child: Icon(icon, color: isEndCall ? Colors.white : color, size: iconSize),
       ),
     );
   }

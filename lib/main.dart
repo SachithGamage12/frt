@@ -7,9 +7,10 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'interface.dart'; // Adjust path if different
+import 'interface.dart';
 import 'payment_page.dart';
 import 'admin_panel.dart';
+import 'style_utils.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -271,22 +272,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   bool _obscurePassword = true;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Error', style: TextStyle(color: Colors.redAccent)),
-        content: Text(message, style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK', style: TextStyle(color: Colors.cyanAccent)),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   void initState() {
@@ -352,7 +337,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   Future<void> _login() async {
     if (_mobileController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showErrorDialog('Please enter mobile number and password');
+      AppAlerts.show(context, 'Please enter mobile number and password', isError: true);
       return;
     }
 
@@ -414,10 +399,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           );
         }
       } else {
-        _showErrorDialog('Invalid mobile number or password');
+        AppAlerts.show(context, 'Invalid mobile number or password', isError: true);
       }
     } catch (e) {
-      _showErrorDialog('Error: $e');
+      AppAlerts.show(context, 'Error: $e', isError: true);
     }
   }
 
@@ -717,9 +702,7 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This mobile number is already registered')),
-        );
+        AppAlerts.show(context, 'This mobile number is already registered', isError: true);
         return;
       }
 
@@ -750,9 +733,7 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      AppAlerts.show(context, 'Error: $e', isError: true);
     }
   }
 
@@ -1011,11 +992,51 @@ class _TellUsAboutYouPageState extends State<TellUsAboutYouPage> with SingleTick
     super.dispose();
   }
 
+  void _showTermsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('Terms & Conditions', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Text(
+              '''Effective Date: April 2026
+
+Welcome to FRT (Family Road Track). These Business Terms & Conditions ("Terms") govern your use of the FRT application and associated services provided by UcodeX Solution. Please read them carefully.
+
+1. Acceptance of Terms
+By downloading, installing, or using the FRT application, you agree to be bound by these Terms. If you do not agree, you are restricted from utilizing our services and tracking features.
+
+2. Service Provision
+FRT provides real-time location sharing, SOS distress calling, and history logging. While we strive to ensure 99.9% uptime, GPS availability, battery constraints, and network coverage may affect software accuracy.
+
+3. User Responsibilities & Lawful Use
+You agree to use this application legally and exclusively for monitoring authorized family members or individuals who have provided explicit consent. Using FRT for unauthorized tracking, stalking, or harassment is strictly prohibited and will result in immediate termination.
+
+4. Premium Accounts
+Select features may require a premium digital subscription. Fees for these subscriptions will be clearly communicated prior to purchase. By confirming your subscription, you authorize automated cyclical billing.
+
+5. Limitations of Liability
+UcodeX Solution and FRT are not liable for any physical or digital damages, losses, or legal ramifications resulting from delayed alerts, application unavailability, or inaccurate tracking locations.''',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close', style: TextStyle(color: Color(0xFF00E5FF))),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveData() async {
     if (_ageController.text.isEmpty || _passwordController.text.isEmpty || !_agreeToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields and agree to the terms')),
-      );
+      AppAlerts.show(context, 'Please fill all required fields and agree to the terms', isError: true);
       return;
     }
 
@@ -1162,13 +1183,23 @@ class _TellUsAboutYouPageState extends State<TellUsAboutYouPage> with SingleTick
                   children: [
                     Checkbox(
                       value: _agreeToTerms,
+                      activeColor: const Color(0xFF00E5FF),
                       onChanged: (value) {
                         setState(() {
                           _agreeToTerms = value!;
                         });
                       },
                     ),
-                    const Text('I agree to the terms and conditions'),
+                    GestureDetector(
+                      onTap: _showTermsDialog,
+                      child: const Text(
+                        'I agree to the terms and conditions',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),

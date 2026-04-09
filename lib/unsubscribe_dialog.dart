@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'style_utils.dart';
 
 class UnsubscribeDialog extends StatefulWidget {
   final String userId;
@@ -20,7 +21,7 @@ class _UnsubscribeDialogState extends State<UnsubscribeDialog> {
   Future<void> _processCancellation() async {
     final feedback = _feedbackController.text.trim();
     if (feedback.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please tell us why you are canceling.")));
+      AppAlerts.show(context, "Please tell us why you are canceling.", isError: true);
       return;
     }
 
@@ -56,14 +57,13 @@ class _UnsubscribeDialogState extends State<UnsubscribeDialog> {
       });
 
       if (mounted) {
-        // Close dialog
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Subscription Cancelled! You still have access until the end of your billing cycle.", style: TextStyle(color: Colors.white))));
+        AppAlerts.show(context, "Subscription Cancelled! You still have access until the end of your billing cycle.");
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      setState(() => _isLoading = true);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error canceling subscription: $e")));
+        AppAlerts.show(context, "Error canceling subscription: $e", isError: true);
       }
     }
   }
@@ -71,10 +71,14 @@ class _UnsubscribeDialogState extends State<UnsubscribeDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: Colors.white.withOpacity(0.9),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
+      backgroundColor: Colors.transparent,
+      child: Container(
         padding: const EdgeInsets.all(24.0),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white10),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,7 +90,7 @@ class _UnsubscribeDialogState extends State<UnsubscribeDialog> {
                 Expanded(
                   child: Text(
                     "Cancel Subscription",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textHeading),
                   ),
                 ),
               ],
@@ -94,16 +98,18 @@ class _UnsubscribeDialogState extends State<UnsubscribeDialog> {
             const SizedBox(height: 16),
             const Text(
               "We're sorry to see you go. Before your premium access is revoked, please tell us why you are leaving and if the app was useful to you?",
-              style: TextStyle(fontSize: 14, color: Colors.black54),
+              style: TextStyle(fontSize: 14, color: AppColors.textBody),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _feedbackController,
               maxLines: 4,
+              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: "Your feedback...",
+                hintStyle: const TextStyle(color: Colors.white24),
                 filled: true,
-                fillColor: Colors.black12,
+                fillColor: Colors.white.withOpacity(0.05),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
             ),
