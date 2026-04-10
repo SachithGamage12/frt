@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'style_utils.dart';
 
 class CallPage extends StatefulWidget {
@@ -90,9 +91,15 @@ class _CallPageState extends State<CallPage> {
     
     // Clear ringing state from Firestore if we were the caller
     if (widget.isCaller) {
-      await FirebaseFirestore.instance.collection('calls').doc(widget.calleeId).delete().catchError((e) {});
+      try { await FirebaseFirestore.instance.collection('calls').doc(widget.calleeId).delete(); } catch(_) {}
+      if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+        try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('calls').doc(widget.calleeId).delete(); } catch(_) {}
+      }
     } else {
-      await FirebaseFirestore.instance.collection('calls').doc(widget.callerId).delete().catchError((e) {});
+      try { await FirebaseFirestore.instance.collection('calls').doc(widget.callerId).delete(); } catch(_) {}
+      if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+        try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('calls').doc(widget.callerId).delete(); } catch(_) {}
+      }
     }
     
     if (mounted) {

@@ -16,6 +16,36 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
+    
+    // Initialize secondary Firebase app to sync across Android/iOS divided DBs
+    if (Platform.isAndroid) {
+      try {
+        await Firebase.initializeApp(
+          name: 'secondaryApp',
+          options: const FirebaseOptions(
+             apiKey: 'AIzaSyCmtV4tRTpCCgFZIVxGsW2lLiExZsTIOR4',
+             appId: '1:1060214465512:ios:377eddb6c315792a43ba5d',
+             messagingSenderId: '1060214465512',
+             projectId: 'frtapp-ff79b',
+             storageBucket: 'frtapp-ff79b.firebasestorage.app',
+          ),
+        );
+      } catch(e) {}
+    } else if (Platform.isIOS) {
+      try {
+        await Firebase.initializeApp(
+          name: 'secondaryApp',
+          options: const FirebaseOptions(
+            apiKey: 'AIzaSyABraObEM0yqXaU7sB2ylzqjhGnl1SXmXc',
+            appId: '1:422057941225:android:a8567fd0663acba1b0f878',
+            messagingSenderId: '422057941225',
+            projectId: 'testapp-ce8aa',
+            storageBucket: 'testapp-ce8aa.firebasestorage.app',
+          ),
+        );
+      } catch(e) {}
+    }
+
     _initializeFCM(); // Non-blocking
   } catch (e) {
     print("Firebase initialization error: $e");

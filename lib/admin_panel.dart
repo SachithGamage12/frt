@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:math' as math;
@@ -104,20 +105,30 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   Widget _buildDashboard() {
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore.collection('users').snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      builder: (context, snapshot1) {
+        return StreamBuilder<QuerySnapshot>(
+          stream: Firebase.apps.any((app) => app.name == 'secondaryApp')
+              ? FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('users').snapshots()
+              : const Stream.empty(),
+          builder: (context, snapshot2) {
+            if (!snapshot1.hasData) return const Center(child: CircularProgressIndicator());
 
-        int totalUsers = snapshot.data!.docs.length;
-        int activeSubscribers = snapshot.data!.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          if (data['subscriptionExpiry'] == null) return false;
-          return (data['subscriptionExpiry'] as Timestamp).toDate().isAfter(DateTime.now());
-        }).length;
+            var allDocs = [...snapshot1.data!.docs];
+            if (snapshot2.hasData && snapshot2.data != null) {
+              allDocs.addAll(snapshot2.data!.docs);
+            }
 
-        int pendingApprovals = snapshot.data!.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          return data['paymentStatus'] == 'pending';
-        }).length;
+            int totalUsers = allDocs.length;
+            int activeSubscribers = allDocs.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              if (data['subscriptionExpiry'] == null) return false;
+              return (data['subscriptionExpiry'] as Timestamp).toDate().isAfter(DateTime.now());
+            }).length;
+
+            int pendingApprovals = allDocs.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return data['paymentStatus'] == 'pending';
+            }).length;
 
         double totalRevenue = activeSubscribers * 350.0;
 
@@ -142,6 +153,8 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
               ),
             ],
           ),
+        );
+          },
         );
       },
     );
@@ -219,16 +232,27 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   Widget _buildApprovalsList() {
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore.collection('users').where('paymentStatus', isEqualTo: 'pending').snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        if (snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('No pending approvals', style: TextStyle(color: Colors.white70)));
-        }
+      builder: (context, snapshot1) {
+        return StreamBuilder<QuerySnapshot>(
+          stream: Firebase.apps.any((app) => app.name == 'secondaryApp')
+              ? FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('users').where('paymentStatus', isEqualTo: 'pending').snapshots()
+              : const Stream.empty(),
+          builder: (context, snapshot2) {
+            if (!snapshot1.hasData) return const Center(child: CircularProgressIndicator());
 
-        return ListView.builder(
-          itemCount: snapshot.data!.docs.length,
-          itemBuilder: (context, index) {
-            var userDoc = snapshot.data!.docs[index];
+            var allDocs = [...snapshot1.data!.docs];
+            if (snapshot2.hasData && snapshot2.data != null) {
+              allDocs.addAll(snapshot2.data!.docs);
+            }
+
+            if (allDocs.isEmpty) {
+              return const Center(child: Text('No pending approvals', style: TextStyle(color: Colors.white70)));
+            }
+
+            return ListView.builder(
+              itemCount: allDocs.length,
+              itemBuilder: (context, index) {
+                var userDoc = allDocs[index];
             var data = userDoc.data() as Map<String, dynamic>;
 
             return AnimatedContainer(
@@ -277,6 +301,8 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
                 onTap: () => _showApprovalDialog(userDoc.id, data),
               ),
             );
+          },
+        );
           },
         );
       },
@@ -421,7 +447,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
           promoCode += chars[rnd.nextInt(chars.length)];
         }
 
-        await _firestore.collection('users').doc(userId).update({
+        final updateData = {
           'isAppUnlocked': true,
           'paymentStatus': 'approved',
           'subscriptionExpiry': Timestamp.fromDate(expiry),
@@ -429,13 +455,18 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
           'promoCode': promoCode,
           'isPromoCodeUsed': false,
           'isFirstLoginAfterApprove': true,
-        });
+        };
+        try { await _firestore.collection('users').doc(userId).update(updateData); } catch(_) {}
+        if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+          try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('users').doc(userId).update(updateData); } catch(_) {}
+        }
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account Approved! Notification Sent.')));
         AppAlerts.show(context, 'Account Approved! Notification Sent.');
       } else {
-        await _firestore.collection('users').doc(userId).update({
-          'paymentStatus': 'rejected',
-        });
+        try { await _firestore.collection('users').doc(userId).update({ 'paymentStatus': 'rejected' }); } catch(_) {}
+        if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+          try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('users').doc(userId).update({ 'paymentStatus': 'rejected' }); } catch(_) {}
+        }
         AppAlerts.show(context, 'Account Rejected.');
       }
     } catch (e) {
@@ -446,17 +477,37 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   Widget _buildCancellationsList() {
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore.collection('cancellations').orderBy('timestamp', descending: true).snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        if (snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('No cancellation records', style: TextStyle(color: Colors.white70)));
-        }
+      builder: (context, snapshot1) {
+        return StreamBuilder<QuerySnapshot>(
+          stream: Firebase.apps.any((app) => app.name == 'secondaryApp')
+              ? FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('cancellations').orderBy('timestamp', descending: true).snapshots()
+              : const Stream.empty(),
+          builder: (context, snapshot2) {
+            if (!snapshot1.hasData) return const Center(child: CircularProgressIndicator());
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: snapshot.data!.docs.length,
-          itemBuilder: (context, index) {
-            var doc = snapshot.data!.docs[index];
+            var allDocs = [...snapshot1.data!.docs];
+            if (snapshot2.hasData && snapshot2.data != null) {
+              allDocs.addAll(snapshot2.data!.docs);
+            }
+
+            allDocs.sort((a, b) {
+              final valA = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
+              final valB = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
+              if (valA == null && valB == null) return 0;
+              if (valA == null) return 1;
+              if (valB == null) return -1;
+              return valB.compareTo(valA);
+            });
+
+            if (allDocs.isEmpty) {
+              return const Center(child: Text('No cancellation records', style: TextStyle(color: Colors.white70)));
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: allDocs.length,
+              itemBuilder: (context, index) {
+                var doc = allDocs[index];
             var data = doc.data() as Map<String, dynamic>;
             DateTime? ts = (data['timestamp'] as Timestamp?)?.toDate();
 
@@ -522,6 +573,8 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
                 ),
               ),
             );
+          },
+        );
           },
         );
       },

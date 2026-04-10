@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -76,7 +77,10 @@ class _InterfacePageState extends State<InterfacePage>
           TextButton(
             onPressed: () async {
               // Decline
-              await FirebaseFirestore.instance.collection('calls').doc(widget.userId).delete().catchError((e){});
+              try { await FirebaseFirestore.instance.collection('calls').doc(widget.userId).delete(); } catch(_) {}
+              if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+                try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('calls').doc(widget.userId).delete(); } catch(_) {}
+              }
               if (mounted) {
                 Navigator.pop(context);
               }
@@ -112,12 +116,17 @@ class _InterfacePageState extends State<InterfacePage>
     final channelName = 'room_${widget.userId}_$targetUserId';
     
     // Create ringing doc for target
-    await FirebaseFirestore.instance.collection('calls').doc(targetUserId).set({
+    final callData = {
       'callerId': widget.userId,
       'callerName': _userData?['name'] ?? 'Family Member',
       'channelName': channelName,
       'timestamp': FieldValue.serverTimestamp(),
-    });
+    };
+
+    try { await FirebaseFirestore.instance.collection('calls').doc(targetUserId).set(callData); } catch(_) {}
+    if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+      try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('calls').doc(targetUserId).set(callData); } catch(_) {}
+    }
 
     if (mounted) {
       Navigator.push(
@@ -482,19 +491,20 @@ class _InterfacePageState extends State<InterfacePage>
 
     // Get initial position and save to Firestore
     Position initialPosition = await Geolocator.getCurrentPosition();
-    await FirebaseFirestore.instance
-        .collection('liveLocations')
-        .doc(sharingId)
-        .set({
-          'userId': widget.userId,
-          'latitude': initialPosition.latitude,
-          'longitude': initialPosition.longitude,
-          'heading': initialPosition.heading,
-          'speed': initialPosition.speed,
-          'timestamp': FieldValue.serverTimestamp(),
-          'userName': _userData?['name'] ?? 'Unknown',
-          'profilePicture': _userData?['profilePicture'],
-        });
+    final locData = {
+      'userId': widget.userId,
+      'latitude': initialPosition.latitude,
+      'longitude': initialPosition.longitude,
+      'heading': initialPosition.heading,
+      'speed': initialPosition.speed,
+      'timestamp': FieldValue.serverTimestamp(),
+      'userName': _userData?['name'] ?? 'Unknown',
+      'profilePicture': _userData?['profilePicture'],
+    };
+    try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locData); } catch(_) {}
+    if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+      try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('liveLocations').doc(sharingId).set(locData); } catch(_) {}
+    }
 
     // Start position stream
     _positionStream?.cancel();
@@ -505,19 +515,20 @@ class _InterfacePageState extends State<InterfacePage>
       ),
     ).listen(
       (Position position) async {
-        await FirebaseFirestore.instance
-            .collection('liveLocations')
-            .doc(sharingId)
-            .set({
-              'userId': widget.userId,
-              'latitude': position.latitude,
-              'longitude': position.longitude,
-              'heading': position.heading,
-              'speed': position.speed,
-              'timestamp': FieldValue.serverTimestamp(),
-              'userName': _userData?['name'] ?? 'Unknown',
-              'profilePicture': _userData?['profilePicture'],
-            });
+        final locUpdate = {
+          'userId': widget.userId,
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'heading': position.heading,
+          'speed': position.speed,
+          'timestamp': FieldValue.serverTimestamp(),
+          'userName': _userData?['name'] ?? 'Unknown',
+          'profilePicture': _userData?['profilePicture'],
+        };
+        try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locUpdate); } catch(_) {}
+        if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+          try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('liveLocations').doc(sharingId).set(locUpdate); } catch(_) {}
+        }
       },
       onError: (e) {
         print('Position stream error: $e');
@@ -571,10 +582,11 @@ class _InterfacePageState extends State<InterfacePage>
 
   Future<void> _stopLiveLocationSharing() async {
     if (_liveLocationSharingId != null) {
-      await FirebaseFirestore.instance
-          .collection('liveLocations')
-          .doc(_liveLocationSharingId)
-          .delete();
+      try { await FirebaseFirestore.instance.collection('liveLocations').doc(_liveLocationSharingId).delete(); } catch(_) {}
+      if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+        try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('liveLocations').doc(_liveLocationSharingId).delete(); } catch(_) {}
+      }
+      
       // Clear the stored sharingId
       await FirebaseFirestore.instance
           .collection('users')
