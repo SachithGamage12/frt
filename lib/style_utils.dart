@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const Color primary = Color(0xFF00E5FF); // Cyan Accent
+  static const Color primary = Color(0xFFCE93D8); // Light Purple (Purple 200)
   static const Color secondary = Color(0xFF00B4D8);
   static const Color background = Color(0xFF0F2027); // Deep Navy
   static const Color surface = Color(0xFF1E1E1E); // Dark Gray

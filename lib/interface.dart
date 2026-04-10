@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -11,6 +10,7 @@ import 'user_details_page.dart';
 import 'location_view_page.dart';
 import 'call_page.dart';
 import 'style_utils.dart';
+import 'firebase_utils.dart';
 
 class InterfacePage extends StatefulWidget {
   final String userId;
@@ -41,6 +41,7 @@ class _InterfacePageState extends State<InterfacePage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    FirebaseUtils.initializeSecondaryApp();
     _initForegroundTask();
     _fetchUserData();
     _checkLocationPermission();
@@ -78,8 +79,9 @@ class _InterfacePageState extends State<InterfacePage>
             onPressed: () async {
               // Decline
               try { await FirebaseFirestore.instance.collection('calls').doc(widget.userId).delete(); } catch(_) {}
-              if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-                try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('calls').doc(widget.userId).delete(); } catch(_) {}
+              final secFirestore = FirebaseUtils.secondaryFirestore;
+              if (secFirestore != null) {
+                try { await secFirestore.collection('calls').doc(widget.userId).delete(); } catch(_) {}
               }
               if (mounted) {
                 Navigator.pop(context);
@@ -124,8 +126,9 @@ class _InterfacePageState extends State<InterfacePage>
     };
 
     try { await FirebaseFirestore.instance.collection('calls').doc(targetUserId).set(callData); } catch(_) {}
-    if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-      try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('calls').doc(targetUserId).set(callData); } catch(_) {}
+    final secFirestore = FirebaseUtils.secondaryFirestore;
+    if (secFirestore != null) {
+      try { await secFirestore.collection('calls').doc(targetUserId).set(callData); } catch(_) {}
     }
 
     if (mounted) {
@@ -502,8 +505,9 @@ class _InterfacePageState extends State<InterfacePage>
       'profilePicture': _userData?['profilePicture'],
     };
     try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locData); } catch(_) {}
-    if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-      try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('liveLocations').doc(sharingId).set(locData); } catch(_) {}
+    final secFirestore = FirebaseUtils.secondaryFirestore;
+    if (secFirestore != null) {
+      try { await secFirestore.collection('liveLocations').doc(sharingId).set(locData); } catch(_) {}
     }
 
     // Start position stream
@@ -526,8 +530,9 @@ class _InterfacePageState extends State<InterfacePage>
           'profilePicture': _userData?['profilePicture'],
         };
         try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locUpdate); } catch(_) {}
-        if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-          try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('liveLocations').doc(sharingId).set(locUpdate); } catch(_) {}
+        final secFirestore = FirebaseUtils.secondaryFirestore;
+        if (secFirestore != null) {
+          try { await secFirestore.collection('liveLocations').doc(sharingId).set(locUpdate); } catch(_) {}
         }
       },
       onError: (e) {
@@ -583,8 +588,9 @@ class _InterfacePageState extends State<InterfacePage>
   Future<void> _stopLiveLocationSharing() async {
     if (_liveLocationSharingId != null) {
       try { await FirebaseFirestore.instance.collection('liveLocations').doc(_liveLocationSharingId).delete(); } catch(_) {}
-      if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-        try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('liveLocations').doc(_liveLocationSharingId).delete(); } catch(_) {}
+      final secFirestore = FirebaseUtils.secondaryFirestore;
+      if (secFirestore != null) {
+        try { await secFirestore.collection('liveLocations').doc(_liveLocationSharingId).delete(); } catch(_) {}
       }
       
       // Clear the stored sharingId
@@ -885,21 +891,22 @@ class _InterfacePageState extends State<InterfacePage>
           children: [
             Text(
               'FRT Tracking Hub',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
             ),
             Text(
               'Live Secure Connection',
-              style: TextStyle(fontSize: 10, color: AppColors.primary, letterSpacing: 1.2),
+              style: TextStyle(fontSize: 10, color: Colors.black54, letterSpacing: 1.2),
             ),
           ],
         ),
         centerTitle: true,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.primary,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.black),
         flexibleSpace: Container(
           decoration: BoxDecoration(
-            color: AppColors.background.withOpacity(0.8),
-            border: Border(bottom: BorderSide(color: Colors.white10)),
+            color: AppColors.primary,
+            border: Border(bottom: BorderSide(color: Colors.black12)),
           ),
         ),
         actions: [

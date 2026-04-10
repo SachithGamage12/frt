@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:math' as math;
 import 'style_utils.dart';
+import 'firebase_utils.dart';
 
 class AdminPanelPage extends StatefulWidget {
   const AdminPanelPage({super.key});
@@ -21,6 +21,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    FirebaseUtils.initializeSecondaryApp();
   }
 
   @override
@@ -107,9 +108,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
       stream: _firestore.collection('users').snapshots(),
       builder: (context, snapshot1) {
         return StreamBuilder<QuerySnapshot>(
-          stream: Firebase.apps.any((app) => app.name == 'secondaryApp')
-              ? FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('users').snapshots()
-              : const Stream.empty(),
+          stream: FirebaseUtils.secondaryFirestore?.collection('users').snapshots() ?? const Stream.empty(),
           builder: (context, snapshot2) {
             if (!snapshot1.hasData) return const Center(child: CircularProgressIndicator());
 
@@ -234,9 +233,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
       stream: _firestore.collection('users').where('paymentStatus', isEqualTo: 'pending').snapshots(),
       builder: (context, snapshot1) {
         return StreamBuilder<QuerySnapshot>(
-          stream: Firebase.apps.any((app) => app.name == 'secondaryApp')
-              ? FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('users').where('paymentStatus', isEqualTo: 'pending').snapshots()
-              : const Stream.empty(),
+          stream: FirebaseUtils.secondaryFirestore?.collection('users').where('paymentStatus', isEqualTo: 'pending').snapshots() ?? const Stream.empty(),
           builder: (context, snapshot2) {
             if (!snapshot1.hasData) return const Center(child: CircularProgressIndicator());
 
@@ -457,15 +454,17 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
           'isFirstLoginAfterApprove': true,
         };
         try { await _firestore.collection('users').doc(userId).update(updateData); } catch(_) {}
-        if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-          try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('users').doc(userId).update(updateData); } catch(_) {}
+        final secFirestore = FirebaseUtils.secondaryFirestore;
+        if (secFirestore != null) {
+          try { await secFirestore.collection('users').doc(userId).update(updateData); } catch(_) {}
         }
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account Approved! Notification Sent.')));
         AppAlerts.show(context, 'Account Approved! Notification Sent.');
       } else {
         try { await _firestore.collection('users').doc(userId).update({ 'paymentStatus': 'rejected' }); } catch(_) {}
-        if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-          try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('users').doc(userId).update({ 'paymentStatus': 'rejected' }); } catch(_) {}
+        final secFirestore = FirebaseUtils.secondaryFirestore;
+        if (secFirestore != null) {
+          try { await secFirestore.collection('users').doc(userId).update({ 'paymentStatus': 'rejected' }); } catch(_) {}
         }
         AppAlerts.show(context, 'Account Rejected.');
       }
@@ -479,9 +478,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
       stream: _firestore.collection('cancellations').orderBy('timestamp', descending: true).snapshots(),
       builder: (context, snapshot1) {
         return StreamBuilder<QuerySnapshot>(
-          stream: Firebase.apps.any((app) => app.name == 'secondaryApp')
-              ? FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('cancellations').orderBy('timestamp', descending: true).snapshots()
-              : const Stream.empty(),
+          stream: FirebaseUtils.secondaryFirestore?.collection('cancellations').orderBy('timestamp', descending: true).snapshots() ?? const Stream.empty(),
           builder: (context, snapshot2) {
             if (!snapshot1.hasData) return const Center(child: CircularProgressIndicator());
 
