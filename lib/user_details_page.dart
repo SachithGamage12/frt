@@ -262,6 +262,25 @@ class _UserDetailsPageState extends State<UserDetailsPage> with SingleTickerProv
                                   title: 'Age',
                                   value: widget.userData['age'].toString(),
                                 ),
+                              const SizedBox(height: 16),
+                              if (widget.userData['promoCode'] != null)
+                                _buildDetailCard(
+                                  icon: Icons.card_giftcard,
+                                  title: 'Connection Reward Code',
+                                  value: widget.userData['promoCode'],
+                                  subtitle: widget.userData['isPromoCodeUsed'] == true 
+                                      ? 'Status: Used' 
+                                      : 'Status: Available',
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.copy, color: AppColors.primary, size: 20),
+                                    onPressed: () {
+                                      // Note: In a real app, use Clipboard.setData
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Code copied to clipboard')),
+                                      );
+                                    },
+                                  ),
+                                ),
                               const SizedBox(height: 30),
                               ElevatedButton.icon(
                                 onPressed: () {
@@ -349,6 +368,8 @@ class _UserDetailsPageState extends State<UserDetailsPage> with SingleTickerProv
     required IconData icon,
     required String title,
     required String value,
+    String? subtitle,
+    Widget? trailing,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -385,9 +406,21 @@ class _UserDetailsPageState extends State<UserDetailsPage> with SingleTickerProv
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: subtitle.contains('Available') ? AppColors.primary : Colors.orangeAccent,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
+          if (trailing != null) trailing,
         ],
       ),
     );

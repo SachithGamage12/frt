@@ -207,6 +207,16 @@ class _InterfacePageState extends State<InterfacePage>
         setState(() {
           _userData = userDoc.data() as Map<String, dynamic>?;
           _isLoading = false;
+
+          // Check for first login after approval
+          if (_userData?['isFirstLoginAfterApprove'] == true) {
+            _showApprovalWelcomePopup(_userData?['promoCode'] ?? 'N/A');
+            // Reset flag
+            FirebaseFirestore.instance
+                .collection('users')
+                .doc(widget.userId)
+                .update({'isFirstLoginAfterApprove': false});
+          }
         });
       } else {
         setState(() {
@@ -1005,40 +1015,94 @@ class _InterfacePageState extends State<InterfacePage>
           if (_showPopup)
             Center(
               child: Container(
-                width: MediaQuery.of(context).size.width * 0.8,
-                height: MediaQuery.of(context).size.height * 0.4,
+                width: MediaQuery.of(context).size.width * 0.85,
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 10,
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 30,
                       spreadRadius: 5,
                     ),
                   ],
                 ),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (_locationData != null)
-                      QrImageView(
-                        data: _locationData!,
-                        version: QrVersions.auto,
-                        size: 200.0,
-                      )
-                    else
-                      const CircularProgressIndicator(),
-                    const SizedBox(height: 20),
-                    Text(
-                      _isSharingLiveLocation
-                          ? 'Scan this QR code to track my live location'
-                          : 'Scan this QR code to fetch my location',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
                       ),
-                      textAlign: TextAlign.center,
+                      child: const Column(
+                        children: [
+                          Icon(Icons.qr_code_2, color: AppColors.primary, size: 40),
+                          SizedBox(height: 8),
+                          Text(
+                            'Share Connection',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        children: [
+                          if (_locationData != null)
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: QrImageView(
+                                data: _locationData!,
+                                version: QrVersions.auto,
+                                size: 200.0,
+                                eyeStyle: const QrEyeStyle(
+                                  eyeShape: QrEyeShape.square,
+                                  color: Colors.black,
+                                ),
+                                dataModuleStyle: const QrDataModuleStyle(
+                                  dataModuleShape: QrDataModuleShape.square,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            )
+                          else
+                            const SizedBox(
+                              height: 200,
+                              child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                            ),
+                          const SizedBox(height: 24),
+                          Text(
+                            _isSharingLiveLocation
+                                ? 'Scanning this code will track your live location in real-time.'
+                                : 'Generic location sharing. Active sharing is currently OFF.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () => setState(() => _showPopup = false),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              ),
+                              child: const Text('Close Portal', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1047,33 +1111,21 @@ class _InterfacePageState extends State<InterfacePage>
           if (_showScanner)
             Center(
               child: Container(
-                width: MediaQuery.of(context).size.width * 0.8,
-                height: MediaQuery.of(context).size.height * 0.6,
+                width: MediaQuery.of(context).size.width * 0.9,
+                height: MediaQuery.of(context).size.height * 0.7,
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(32),
+                  border: Border.all(color: Colors.white10),
                   boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 10,
-                      spreadRadius: 5,
-                    ),
+                    BoxShadow(color: AppColors.primary.withOpacity(0.1), blurRadius: 40),
                   ],
                 ),
-                child: Column(
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text(
-                        'Scan a QR Code',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: MobileScanner(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: Stack(
+                    children: [
+                      MobileScanner(
                         controller: _mobileScannerController,
                         onDetect: (capture) {
                           final List<Barcode> barcodes = capture.barcodes;
@@ -1086,19 +1138,32 @@ class _InterfacePageState extends State<InterfacePage>
                           }
                         },
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _showScanner = false;
-                          });
-                        },
-                        child: const Text('Cancel'),
+                      // Scanner Overlay
+                      CustomPaint(
+                        painter: ScannerOverlayPainter(),
+                        child: Container(),
                       ),
-                    ),
-                  ],
+                      Positioned(
+                        top: 20,
+                        right: 20,
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                          onPressed: () => setState(() => _showScanner = false),
+                        ),
+                      ),
+                      const Positioned(
+                        bottom: 40,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Text(
+                            'Align QR code within the frame',
+                            style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1214,6 +1279,93 @@ class _InterfacePageState extends State<InterfacePage>
       ),
     );
   }
+
+  void _showApprovalWelcomePopup(String promoCode) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+            boxShadow: [
+              BoxShadow(color: AppColors.primary.withOpacity(0.1), blurRadius: 40, spreadRadius: 10),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.card_giftcard, color: AppColors.primary, size: 40),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Account Approved!',
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'As a welcome gift, we\'ve issued a connection code for you to gift to a family member.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      promoCode,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Valid for 30 days • One-time use',
+                style: TextStyle(color: Colors.white38, fontSize: 11),
+              ),
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text('Start Tracking', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 void startLocationUpdates() async {
@@ -1271,4 +1423,78 @@ void startLocationUpdates() async {
   );
 
   FlutterForegroundTask.setOnLockScreenVisibility(true);
+}
+
+class ScannerOverlayPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.black54
+      ..style = PaintingStyle.fill;
+
+    final rectPath = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    final scanWidth = size.width * 0.7;
+    final scanHeight = size.width * 0.7;
+    final scanRect = Rect.fromCenter(
+      center: Offset(size.width / 2, size.height / 2),
+      width: scanWidth,
+      height: scanHeight,
+    );
+
+    final scanPath = Path()..addRRect(RRect.fromRectAndRadius(scanRect, const Radius.circular(20)));
+
+    final combinedPath = Path.combine(PathOperation.difference, rectPath, scanPath);
+    canvas.drawPath(combinedPath, paint);
+
+    final borderPaint = Paint()
+      ..color = AppColors.primary
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+
+    canvas.drawRRect(RRect.fromRectAndRadius(scanRect, const Radius.circular(20)), borderPaint);
+    
+    // Corner marks
+    final markSize = 40.0;
+    final markPaint = Paint()
+      ..color = AppColors.primary
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6.0;
+
+    // Top Left
+    canvas.drawPath(
+      Path()
+        ..moveTo(scanRect.left, scanRect.top + markSize)
+        ..lineTo(scanRect.left, scanRect.top)
+        ..lineTo(scanRect.left + markSize, scanRect.top),
+      markPaint,
+    );
+    // Top Right
+    canvas.drawPath(
+      Path()
+        ..moveTo(scanRect.right - markSize, scanRect.top)
+        ..lineTo(scanRect.right, scanRect.top)
+        ..lineTo(scanRect.right, scanRect.top + markSize),
+      markPaint,
+    );
+    // Bottom Left
+    canvas.drawPath(
+      Path()
+        ..moveTo(scanRect.left, scanRect.bottom - markSize)
+        ..lineTo(scanRect.left, scanRect.bottom)
+        ..lineTo(scanRect.left + markSize, scanRect.bottom),
+      markPaint,
+    );
+    // Bottom Right
+    canvas.drawPath(
+      Path()
+        ..moveTo(scanRect.right - markSize, scanRect.bottom)
+        ..lineTo(scanRect.right, scanRect.bottom)
+        ..lineTo(scanRect.right, scanRect.bottom - markSize),
+      markPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

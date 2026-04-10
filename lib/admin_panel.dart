@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:math' as math;
 import 'style_utils.dart';
 
 class AdminPanelPage extends StatefulWidget {
@@ -30,20 +31,56 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Admin Management Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.blueGrey.shade900,
-        elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.primary,
-          tabs: const [
-            Tab(icon: Icon(Icons.dashboard), text: 'Stats'),
-            Tab(icon: Icon(Icons.pending_actions), text: 'Approvals'),
-            Tab(icon: Icon(Icons.feedback_outlined), text: 'Cancellations'),
-            Tab(icon: Icon(Icons.settings), text: 'Bank'),
+        automaticallyImplyLeading: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Admin Dashboard', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+            Text('Central Management Hub', style: TextStyle(color: Colors.white54, fontSize: 12)),
           ],
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: AppColors.primary),
+            onPressed: () => setState(() {}),
+          ),
+          const SizedBox(width: 8),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withOpacity(0.5)),
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: Colors.white54,
+              labelPadding: EdgeInsets.zero,
+              tabs: const [
+                Tab(icon: Icon(Icons.analytics_outlined, size: 20), text: 'Stats'),
+                Tab(icon: Icon(Icons.verified_user_outlined, size: 20), text: 'Approvals'),
+                Tab(icon: Icon(Icons.feedback_outlined, size: 20), text: 'Exit log'),
+                Tab(icon: Icon(Icons.account_balance_outlined, size: 20), text: 'Bank'),
+              ],
+            ),
+          ),
         ),
       ),
       body: TabBarView(
@@ -236,11 +273,22 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
     try {
       if (approved) {
         DateTime expiry = DateTime.now().add(const Duration(days: 30));
+        // Generate 6-digit promo code (Uppercase + Numbers)
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid confusing O/0, I/1
+        String promoCode = '';
+        math.Random rnd = math.Random();
+        for (var i = 0; i < 6; i++) {
+          promoCode += chars[rnd.nextInt(chars.length)];
+        }
+
         await _firestore.collection('users').doc(userId).update({
           'isAppUnlocked': true,
           'paymentStatus': 'approved',
           'subscriptionExpiry': Timestamp.fromDate(expiry),
           'approvalDate': FieldValue.serverTimestamp(),
+          'promoCode': promoCode,
+          'isPromoCodeUsed': false,
+          'isFirstLoginAfterApprove': true,
         });
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account Approved! Notification Sent.')));
         AppAlerts.show(context, 'Account Approved! Notification Sent.');
