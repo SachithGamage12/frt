@@ -564,28 +564,26 @@ class _InterfacePageState extends State<InterfacePage>
     bool isLive = false,
     String? sharingId,
   }) {
-    final userData = {
-      'userId': widget.userId,
-      'name': _userData?['name'] ?? 'Unknown',
-      'profilePicture': _userData?['profilePicture'],
-      'phone': _userData?['phone'],
-      'email': _userData?['email'],
-    };
-
     if (isLive && sharingId != null) {
       return jsonEncode({
         'type': 'live',
         'sharingId': sharingId,
-        'user': userData,
+        'userId': widget.userId,
+        'userName': _userData?['name'] ?? 'Unknown',
+        'profilePicture': _userData?['profilePicture'],
         'timestamp': DateTime.now().toIso8601String(),
+        'platform': Platform.isAndroid ? 'android' : 'ios',
       });
     } else {
       return jsonEncode({
         'type': 'static',
         'latitude': lat,
         'longitude': lng,
-        'user': userData,
+        'userId': widget.userId,
+        'userName': _userData?['name'] ?? 'Unknown',
+        'profilePicture': _userData?['profilePicture'],
         'timestamp': DateTime.now().toIso8601String(),
+        'platform': Platform.isAndroid ? 'android' : 'ios',
       });
     }
   }
@@ -698,7 +696,27 @@ class _InterfacePageState extends State<InterfacePage>
 
     try {
       final decodedData = jsonDecode(code);
+      String? sharingId;
+      String? userName;
+      String? profilePicture;
+      String? userId;
+
       if (decodedData['sharingId'] != null) {
+        sharingId = decodedData['sharingId'];
+        userName = decodedData['userName'] ?? decodedData['user']?['name'];
+        profilePicture = decodedData['profilePicture'] ?? decodedData['user']?['profilePicture'];
+        userId = decodedData['userId'] ?? decodedData['user']?['userId'];
+      } else if (decodedData['user'] != null) {
+        // Universal fallback for older or different formatted codes
+        userName = decodedData['user']['name'];
+        profilePicture = decodedData['user']['profilePicture'];
+        userId = decodedData['user']['userId'];
+        sharingId = decodedData['sharingId'];
+      }
+
+      if (sharingId != null || (decodedData['type'] == 'static' && decodedData['latitude'] != null)) {
+        final displayName = userName ?? 'Unknown User';
+        
         // Confirmation dialog
         final confirmed = await showDialog<bool>(
           context: context,
@@ -706,7 +724,7 @@ class _InterfacePageState extends State<InterfacePage>
             backgroundColor: AppColors.surface,
             title: const Text('New Connection', style: TextStyle(color: Colors.white)),
             content: Text(
-              'View live location of ${decodedData['userName']}?',
+              'View live location of $displayName?',
               style: const TextStyle(color: Colors.white70),
             ),
             actions: [
@@ -724,118 +742,33 @@ class _InterfacePageState extends State<InterfacePage>
         );
 
         if (confirmed == true && mounted) {
-          _navigateToLocationView(
-            code,
-            decodedData['userName'],
-            decodedData['profilePicture'],
-          );
-        }
-      } else if (decodedData is Map<String, dynamic>) {
-        final userData = decodedData['user'] as Map<String, dynamic>?;
-        final userName = userData?['name'] ?? 'Unknown';
-        final profilePicture = userData?['profilePicture'];
-        final userId = userData?['userId'];
-
-        if (userId != null && userData != null) {
+          // Save and Navigate
           _saveFamilyMember({
-            'userId': userId,
-            'name': userName,
+            'userId': userId ?? 'unknown_${DateTime.now().millisecondsSinceEpoch}',
+            'name': displayName,
             'profilePicture': profilePicture,
             'locationData': code,
           });
-        }
 
-        _showScannedUserProfile(
-          userName: userName,
-          profilePicture: profilePicture,
-          locationData: code,
-          userId: userId,
-        );
+          _navigateToLocationView(
+            code,
+            displayName,
+            profilePicture,
+          );
+        }
       }
     } catch (e) {
-      if (code.startsWith('live:')) {
-        _showScannedUserProfile(userName: 'Unknown User', locationData: code);
-      } else {
-        _showScannedUserProfile(
-          userName: 'Unknown Location',
-          locationData: code,
+      debugPrint('QR Code Decode Error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not read QR code. Pleast try again.')),
         );
       }
+    } finally {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) setState(() => _isHandlingQr = false);
+      });
     }
-  }
-
-  void _showScannedUserProfile({
-    required String userName,
-    String? profilePicture,
-    required String locationData,
-    String? userId,
-  }) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            contentPadding: EdgeInsets.zero,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (profilePicture != null)
-                  Container(
-                    height: 200,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(16),
-                      ),
-                      image: DecorationImage(
-                        image: NetworkImage(profilePicture),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Text(
-                        userName,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Tap to view location',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _navigateToLocationView(
-                            locationData,
-                            userName,
-                            profilePicture,
-                          );
-                        },
-                        child: const Text('VIEW LOCATION'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-    );
   }
 
   void _navigateToLocationView(

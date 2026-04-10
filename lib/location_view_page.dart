@@ -215,46 +215,50 @@ class _LocationViewPageState extends State<LocationViewPage> {
 
   void _startLiveTracking() {
     _locationSubscription?.cancel();
+    _secondarySubscription?.cancel();
     
-    // Check Primary Firestore
+    // Listen to PRIMARY project
     _locationSubscription = FirebaseFirestore.instance
         .collection('liveLocations')
         .doc(widget.sharingId)
         .snapshots()
         .listen((snapshot) {
-      if (snapshot.exists && mounted) {
+      if (snapshot.exists && snapshot.data() != null) {
         _processLocationSnapshot(snapshot.data());
-      } else {
-        // Fallback to Secondary Firestore if possible
-        _checkSecondaryLocation();
       }
-    }, onError: (e) {
-      debugPrint('Primary Firestore listener error: $e');
-      _checkSecondaryLocation();
     });
-  }
 
-  void _checkSecondaryLocation() {
+    // Simultaneously listen to SECONDARY project if initialized
     if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-      FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp'))
+      _secondarySubscription = FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp'))
           .collection('liveLocations')
           .doc(widget.sharingId)
           .snapshots()
           .listen((snapshot) {
-        if (snapshot.exists && mounted) {
+        if (snapshot.exists && snapshot.data() != null) {
           _processLocationSnapshot(snapshot.data());
-        } else if (mounted) {
-          setState(() {
-            _isLocationAvailable = false;
-          });
         }
-      }, onError: (e) {
-        debugPrint('Secondary Firestore listener error: $e');
-        if (mounted) setState(() => _isLocationAvailable = false);
       });
-    } else if (mounted) {
-      setState(() => _isLocationAvailable = false);
     }
+
+    // Use a timer to show 'unavailable' if NO data is received within 5 seconds
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && _markers.isEmpty) {
+        setState(() => _isLocationAvailable = false);
+      }
+    });
+  }
+
+  StreamSubscription<DocumentSnapshot>? _secondarySubscription;
+
+  void _reconnect() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Attempting to reconnect...'), duration: Duration(seconds: 1)),
+    );
+    setState(() {
+      _isLocationAvailable = true; // Temporary reset
+    });
+    _startLiveTracking();
   }
 
   void _processLocationSnapshot(Map<String, dynamic>? data) {
@@ -433,9 +437,14 @@ class _LocationViewPageState extends State<LocationViewPage> {
             ),
           Positioned(
             right: 16,
-            bottom: 120,
+            bottom: 40,
             child: Column(
               children: [
+                _buildMapFab(
+                  icon: Icons.refresh,
+                  onPressed: _reconnect,
+                ),
+                const SizedBox(height: 12),
                 _buildMapFab(
                   icon: Icons.gps_fixed,
                   onPressed: () {
