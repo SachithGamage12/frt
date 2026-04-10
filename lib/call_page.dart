@@ -24,7 +24,7 @@ class CallPage extends StatefulWidget {
 }
 
 class _CallPageState extends State<CallPage> {
-  final String appId = '04360d4224f0484f9d5b57a720dcb87b'; // Agora App ID
+  final String appId = 'ca5bbd43c13b42229ac1ac316fc6e13d'; // Agora App ID (Testing Mode)
   late RtcEngine _engine;
   bool _isMuted = false;
   bool _isSpeakerOn = false;
@@ -46,6 +46,12 @@ class _CallPageState extends State<CallPage> {
       appId: appId,
       channelProfile: ChannelProfileType.channelProfileCommunication,
     ));
+
+    // Optimize audio for voice
+    await _engine.setAudioProfile(
+      profile: AudioProfileType.audioProfileDefault,
+      scenario: AudioScenarioType.audioScenarioDefault,
+    );
 
     _engine.registerEventHandler(
       RtcEngineEventHandler(
@@ -71,7 +77,7 @@ class _CallPageState extends State<CallPage> {
 
     // Join channel
     await _engine.joinChannel(
-      token: '', // Leave empty if token is not required for testing
+      token: '', // No token required for testing mode
       channelId: widget.channelName,
       options: const ChannelMediaOptions(
         clientRoleType: ClientRoleType.clientRoleBroadcaster,
@@ -81,26 +87,36 @@ class _CallPageState extends State<CallPage> {
       uid: 0, // Agora generates random UID
     );
 
-    // Initially route audio to earpiece
-    await _engine.setEnableSpeakerphone(false);
+    // Initially route audio to speaker for tracking app convenience
+    await _engine.setEnableSpeakerphone(true);
+    setState(() => _isSpeakerOn = true);
   }
 
   Future<void> _leaveChannel() async {
-    await _engine.leaveChannel();
-    await _engine.release();
-    
-    // Clear ringing state from Firestore if we were the caller
-    if (widget.isCaller) {
-      try { await FirebaseFirestore.instance.collection('calls').doc(widget.calleeId).delete(); } catch(_) {}
-      if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-        try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('calls').doc(widget.calleeId).delete(); } catch(_) {}
-      }
-    } else {
-      try { await FirebaseFirestore.instance.collection('calls').doc(widget.callerId).delete(); } catch(_) {}
-      if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-        try { await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp')).collection('calls').doc(widget.callerId).delete(); } catch(_) {}
-      }
+    try {
+      await _engine.leaveChannel();
+      await _engine.release();
+    } catch (e) {
+      debugPrint("Error leaving channel: $e");
     }
+    
+    // Clear ringing state from Firestore from BOTH primary and secondary apps
+    final String targetId = widget.isCaller ? widget.calleeId : widget.callerId;
+    
+    // Primary
+    try { 
+      await FirebaseFirestore.instance.collection('calls').doc(targetId).delete(); 
+    } catch(_) {}
+    
+    // Secondary
+    try {
+      if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+        await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp'))
+            .collection('calls')
+            .doc(targetId)
+            .delete();
+      }
+    } catch(_) {}
     
     if (mounted) {
       Navigator.pop(context);

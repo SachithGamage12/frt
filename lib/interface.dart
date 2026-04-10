@@ -37,6 +37,8 @@ class _InterfacePageState extends State<InterfacePage>
   StreamSubscription<DocumentSnapshot>? _callSubscription;
   bool _isCallDialogShowing = false;
 
+  bool _isHandlingQr = false;
+
   @override
   void initState() {
     super.initState();
@@ -687,10 +689,45 @@ class _InterfacePageState extends State<InterfacePage>
     }
   }
 
-  void _handleScannedCode(String code) {
+  Future<void> _handleScannedCode(String code) async {
+    if (_isHandlingQr) return;
+    setState(() => _isHandlingQr = true);
+
     try {
       final decodedData = jsonDecode(code);
-      if (decodedData is Map<String, dynamic>) {
+      if (decodedData['sharingId'] != null) {
+        // Confirmation dialog
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: const Text('New Connection', style: TextStyle(color: Colors.white)),
+            content: Text(
+              'View live location of ${decodedData['userName']}?',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                child: const Text('View', style: TextStyle(color: Colors.black)),
+              ),
+            ],
+          ),
+        );
+
+        if (confirmed == true && mounted) {
+          _navigateToLocationView(
+            code,
+            decodedData['userName'],
+            decodedData['profilePicture'],
+          );
+        }
+      } else if (decodedData is Map<String, dynamic>) {
         final userData = decodedData['user'] as Map<String, dynamic>?;
         final userName = userData?['name'] ?? 'Unknown';
         final profilePicture = userData?['profilePicture'];
@@ -886,28 +923,28 @@ class _InterfacePageState extends State<InterfacePage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8BBD0).withOpacity(0.1), // Very Light Purple/Pinkish background
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Column(
           children: [
             Text(
               'FRT Tracking Hub',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             Text(
               'Live Secure Connection',
-              style: TextStyle(fontSize: 10, color: Colors.black54, letterSpacing: 1.2),
+              style: TextStyle(fontSize: 10, color: Colors.white54, letterSpacing: 1.2),
             ),
           ],
         ),
         centerTitle: true,
-        backgroundColor: AppColors.primary,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: Container(
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            border: Border(bottom: BorderSide(color: Colors.black12)),
+          decoration: const BoxDecoration(
+            color: Colors.black,
+            border: Border(bottom: BorderSide(color: Colors.white10)),
           ),
         ),
         actions: [
@@ -941,10 +978,10 @@ class _InterfacePageState extends State<InterfacePage>
                     children: [
                       Text(
                         "Tracked Circles",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                       Spacer(),
-                      Icon(Icons.people_outline, color: AppColors.primary),
+                      Icon(Icons.people_outline, color: Colors.white70),
                     ],
                   ),
                 ),
@@ -966,7 +1003,7 @@ class _InterfacePageState extends State<InterfacePage>
                         children: [
                             Text(
                               'Scan QR codes to add family members',
-                              style: TextStyle(fontSize: 16, color: Colors.black54),
+                              style: TextStyle(fontSize: 16, color: Colors.white54),
                             ),
                         ],
                       ),
@@ -1160,9 +1197,8 @@ class _InterfacePageState extends State<InterfacePage>
                           final List<Barcode> barcodes = capture.barcodes;
                           for (final barcode in barcodes) {
                             final String? code = barcode.rawValue;
-                            if (code != null) {
+                            if (code != null && !_isHandlingQr) {
                               _handleScannedCode(code);
-                              break;
                             }
                           }
                         },

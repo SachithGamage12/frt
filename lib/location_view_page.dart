@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'style_utils.dart';
@@ -214,59 +215,85 @@ class _LocationViewPageState extends State<LocationViewPage> {
 
   void _startLiveTracking() {
     _locationSubscription?.cancel();
+    
+    // Check Primary Firestore
     _locationSubscription = FirebaseFirestore.instance
         .collection('liveLocations')
         .doc(widget.sharingId)
         .snapshots()
         .listen((snapshot) {
       if (snapshot.exists && mounted) {
-        final data = snapshot.data();
-        final lat = data?['latitude'] as double?;
-        final lng = data?['longitude'] as double?;
-        final heading = data?['heading'] as double? ?? 0;
+        _processLocationSnapshot(snapshot.data());
+      } else {
+        // Fallback to Secondary Firestore if possible
+        _checkSecondaryLocation();
+      }
+    }, onError: (e) {
+      debugPrint('Primary Firestore listener error: $e');
+      _checkSecondaryLocation();
+    });
+  }
 
-        if (lat != null && lng != null) {
-          print('Received update: lat=$lat, lng=$lng, heading=$heading');
-          final newPosition = LatLng(lat, lng);
-
-          double distance = 0;
-          if (_lastPosition != null) {
-            distance = Geolocator.distanceBetween(
-              _lastPosition!.latitude,
-              _lastPosition!.longitude,
-              newPosition.latitude,
-              newPosition.longitude,
-            );
-          }
-
-          if (distance > 5 || _rawPoints.isEmpty) {
-            setState(() {
-              _rawPoints.add(newPosition); // Store raw point for snapping
-              _pathPoints.add(newPosition); // Add to path for immediate drawing
-              _lastPosition = newPosition;
-              _addMarker(newPosition, heading);
-              _isLocationAvailable = true;
-              _updatePolyline(); // Update polyline with new point
-            });
-
-            _updateCamera(newPosition);
-          }
-        } else {
+  void _checkSecondaryLocation() {
+    if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+      FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp'))
+          .collection('liveLocations')
+          .doc(widget.sharingId)
+          .snapshots()
+          .listen((snapshot) {
+        if (snapshot.exists && mounted) {
+          _processLocationSnapshot(snapshot.data());
+        } else if (mounted) {
           setState(() {
             _isLocationAvailable = false;
           });
         }
-      } else {
-        setState(() {
-          _isLocationAvailable = false;
-        });
+      }, onError: (e) {
+        debugPrint('Secondary Firestore listener error: $e');
+        if (mounted) setState(() => _isLocationAvailable = false);
+      });
+    } else if (mounted) {
+      setState(() => _isLocationAvailable = false);
+    }
+  }
+
+  void _processLocationSnapshot(Map<String, dynamic>? data) {
+    if (data == null || !mounted) return;
+    
+    final lat = data['latitude'] as double?;
+    final lng = data['longitude'] as double?;
+    final heading = data['heading'] as double? ?? 0;
+
+    if (lat != null && lng != null) {
+      final newPosition = LatLng(lat, lng);
+
+      double distance = 0;
+      if (_lastPosition != null) {
+        distance = Geolocator.distanceBetween(
+          _lastPosition!.latitude,
+          _lastPosition!.longitude,
+          newPosition.latitude,
+          newPosition.longitude,
+        );
       }
-    }, onError: (e) {
-      debugPrint('Firestore listener error: $e');
+
+      if (distance > 5 || _rawPoints.isEmpty) {
+        setState(() {
+          _rawPoints.add(newPosition);
+          _pathPoints.add(newPosition);
+          _lastPosition = newPosition;
+          _addMarker(newPosition, heading);
+          _isLocationAvailable = true;
+          _updatePolyline();
+        });
+
+        _updateCamera(newPosition);
+      }
+    } else {
       setState(() {
         _isLocationAvailable = false;
       });
-    });
+    }
   }
 
   void _showUserProfile() {
