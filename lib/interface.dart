@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'user_details_page.dart';
 import 'location_view_page.dart';
 import 'call_page.dart';
@@ -1289,6 +1292,39 @@ class _InterfacePageState extends State<InterfacePage>
     );
   }
 
+  Future<void> _deleteFamilyMember(int index) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Delete Connection', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Are you sure you want to remove ${_familyMembers[index]['name']}?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        _familyMembers.removeAt(index);
+      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('family_members', jsonEncode(_familyMembers));
+    }
+  }
+
   Widget _buildFamilyMemberCard(Map<String, dynamic> member, int index) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -1387,6 +1423,10 @@ class _InterfacePageState extends State<InterfacePage>
                   ),
                 ),
                 const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                  onPressed: () => _deleteFamilyMember(index),
+                ),
                 const Icon(Icons.chevron_right, color: Colors.white24),
               ],
             ),
@@ -1505,6 +1545,37 @@ void startLocationUpdates() async {
     return;
   }
 
+  // Initialize Secondary Firebase for background task
+  try {
+    if (!Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+      if (Platform.isAndroid) {
+        await Firebase.initializeApp(
+          name: 'secondaryApp',
+          options: const FirebaseOptions(
+            apiKey: 'AIzaSyCmtV4tRTpCCgFZIVxGsW2lLiExZsTIOR4',
+            appId: '1:1060214465512:android:62c8205792a43ba5d',
+            messagingSenderId: '1060214465512',
+            projectId: 'frtapp-ff79b',
+            storageBucket: 'frtapp-ff79b.firebasestorage.app',
+          ),
+        );
+      } else if (Platform.isIOS) {
+        await Firebase.initializeApp(
+          name: 'secondaryApp',
+          options: const FirebaseOptions(
+            apiKey: 'AIzaSyABraObEM0yqXaU7sB2ylzqjhGnl1SXmXc',
+            appId: '1:422057941225:ios:a8567fd0663acba1b0f878',
+            messagingSenderId: '422057941225',
+            projectId: 'testapp-ce8aa',
+            storageBucket: 'testapp-ce8aa.firebasestorage.app',
+          ),
+        );
+      }
+    }
+  } catch (e) {
+    print('Background secondary init error: $e');
+  }
+
   StreamSubscription<Position>? positionStream;
   positionStream = Geolocator.getPositionStream(
     locationSettings: const LocationSettings(
@@ -1513,19 +1584,38 @@ void startLocationUpdates() async {
     ),
   ).listen(
     (Position position) async {
-      await FirebaseFirestore.instance
-          .collection('liveLocations')
-          .doc(sharingId)
-          .set({
-            'userId': userId,
-            'latitude': position.latitude,
-            'longitude': position.longitude,
-            'heading': position.heading,
-            'speed': position.speed,
-            'timestamp': FieldValue.serverTimestamp(),
-            'userName': userName,
-            'profilePicture': profilePicture,
-          });
+      final locData = {
+        'userId': userId,
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'heading': position.heading,
+        'speed': position.speed,
+        'timestamp': FieldValue.serverTimestamp(),
+        'userName': userName,
+        'profilePicture': profilePicture,
+      };
+
+      // Write to Primary
+      try {
+        await FirebaseFirestore.instance
+            .collection('liveLocations')
+            .doc(sharingId)
+            .set(locData);
+      } catch (e) {
+        print('Background primary write error: $e');
+      }
+
+      // Write to Secondary
+      try {
+        if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+          await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp'))
+              .collection('liveLocations')
+              .doc(sharingId)
+              .set(locData);
+        }
+      } catch (e) {
+        print('Background secondary write error: $e');
+      }
 
       FlutterForegroundTask.updateService(
         notificationTitle: 'Sharing Live Location',

@@ -354,18 +354,24 @@ class _LocationViewPageState extends State<LocationViewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(
           widget.userName,
           style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w900,
-            color: Colors.black,
+            color: Colors.white,
           ),
         ),
-        backgroundColor: AppColors.primary,
+        backgroundColor: Colors.black,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Colors.white10)),
+          ),
+        ),
         actions: [
           if (widget.profilePicture != null)
             Padding(
