@@ -50,6 +50,12 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
             icon: const Icon(Icons.refresh, color: AppColors.primary),
             onPressed: () => setState(() {}),
           ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
+            onPressed: () {
+              Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+            },
+          ),
           const SizedBox(width: 8),
         ],
         bottom: PreferredSize(
@@ -153,25 +159,58 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
 
   Widget _buildModernStatCard(String title, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withOpacity(0.2)),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [color.withOpacity(0.1), Colors.transparent],
-        ),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: color.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.05),
+            blurRadius: 20,
+            spreadRadius: 2,
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Icon(icon, color: color, size: 28),
-          const SizedBox(height: 16),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(title, style: TextStyle(color: color.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w500)),
+          Positioned(
+            right: -10,
+            top: -10,
+            child: Icon(icon, color: color.withOpacity(0.05), size: 100),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const Spacer(),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -192,17 +231,49 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
             var userDoc = snapshot.data!.docs[index];
             var data = userDoc.data() as Map<String, dynamic>;
 
-            return Card(
-              color: Colors.white.withOpacity(0.05),
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundImage: data['profilePicture'] != null ? NetworkImage(data['profilePicture']) : null,
-                  child: data['profilePicture'] == null ? const Icon(Icons.person) : null,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                gradient: LinearGradient(
+                  colors: [Colors.white.withOpacity(0.08), Colors.transparent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                title: Text(data['name'] ?? 'Unknown', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                subtitle: Text(userDoc.id, style: const TextStyle(color: Colors.white54)),
-                trailing: const Icon(Icons.chevron_right, color: Colors.blueAccent),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                leading: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(colors: [Colors.blue, Colors.cyan]),
+                  ),
+                  child: CircleAvatar(
+                    backgroundImage: data['profilePicture'] != null ? NetworkImage(data['profilePicture']) : null,
+                    backgroundColor: AppColors.surface,
+                    child: data['profilePicture'] == null ? const Icon(Icons.person, color: Colors.white70) : null,
+                  ),
+                ),
+                title: Text(
+                  data['name'] ?? 'Unknown', 
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)
+                ),
+                subtitle: Text(
+                  'Pending • ${userDoc.id}', 
+                  style: const TextStyle(color: Colors.white38, fontSize: 11)
+                ),
+                trailing: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.chevron_right, color: AppColors.primary),
+                ),
                 onTap: () => _showApprovalDialog(userDoc.id, data),
               ),
             );
@@ -215,54 +286,123 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   void _showApprovalDialog(String userId, Map<String, dynamic> data) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        title: Text('Review Payment: ${data['name']}', style: const TextStyle(color: Colors.white)),
-        content: SingleChildScrollView(
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Payment Slip:', style: TextStyle(color: Colors.white70)),
-              const SizedBox(height: 10),
-              if (data['paymentSlipUrl'] != null)
-                GestureDetector(
-                  onTap: () async {
-                    final Uri url = Uri.parse(data['paymentSlipUrl']);
-                    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-                      AppAlerts.show(context, 'Could not open file', isError: true);
-                    }
-                  },
-                  child: (data['paymentSlipUrl'].toString().toLowerCase().contains('.pdf') || 
-                          data['paymentSlipUrl'].toString().toLowerCase().contains('/pdf/'))
-                    ? Column(
-                        children: [
-                          const Icon(Icons.picture_as_pdf, color: Colors.red, size: 80),
-                          const Text('Tap to view PDF', style: TextStyle(color: Colors.blueAccent)),
-                        ],
-                      )
-                    : Image.network(data['paymentSlipUrl'], height: 300, fit: BoxFit.contain),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
                 ),
-              const SizedBox(height: 20),
-              Text('Submitted: ${data['paymentTimestamp'] != null ? DateFormat('yyyy-MM-dd HH:mm').format((data['paymentTimestamp'] as Timestamp).toDate()) : 'N/A'}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 40,
+                      backgroundImage: data['profilePicture'] != null ? NetworkImage(data['profilePicture']) : null,
+                      backgroundColor: Colors.black26,
+                      child: data['profilePicture'] == null ? const Icon(Icons.person, size: 40) : null,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      data['name'] ?? 'Unknown User',
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      userId,
+                      style: const TextStyle(color: Colors.white38, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    const Text('VERIFICATION DOCUMENT', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                    const SizedBox(height: 16),
+                    if (data['paymentSlipUrl'] != null)
+                      GestureDetector(
+                        onTap: () async {
+                          final Uri url = Uri.parse(data['paymentSlipUrl']);
+                          if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+                            AppAlerts.show(context, 'Could not open file', isError: true);
+                          }
+                        },
+                        child: Container(
+                          height: 200,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.black26,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white10),
+                          ),
+                          child: (data['paymentSlipUrl'].toString().toLowerCase().contains('.pdf') || 
+                                  data['paymentSlipUrl'].toString().toLowerCase().contains('/pdf/'))
+                            ? const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.picture_as_pdf, color: Colors.red, size: 60),
+                                  SizedBox(height: 8),
+                                  Text('Tap to view PDF', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                                ],
+                              )
+                            : ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Image.network(data['paymentSlipUrl'], fit: BoxFit.cover),
+                              ),
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _handleApproval(userId, false),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.redAccent,
+                              side: const BorderSide(color: Colors.redAccent),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                            child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => _handleApproval(userId, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                            child: const Text('Approve', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close Review', style: TextStyle(color: Colors.white38)),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () => _handleApproval(userId, false),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade900),
-            child: const Text('Reject'),
-          ),
-          ElevatedButton(
-            onPressed: () => _handleApproval(userId, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade900),
-            child: const Text('Approve'),
-          ),
-        ],
       ),
     );
   }
@@ -321,28 +461,65 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
             DateTime? ts = (data['timestamp'] as Timestamp?)?.toDate();
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: Colors.redAccent.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.redAccent.withOpacity(0.1)),
+                color: Colors.white.withOpacity(0.03),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: IntrinsicHeight(
+                  child: Row(
                     children: [
-                      Text(data['email'] ?? 'Unknown User', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      if (ts != null) Text(DateFormat('MMM dd, yr').format(ts), style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                      Container(
+                        width: 4,
+                        color: Colors.redAccent.withOpacity(0.5),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    data['email'] ?? 'Anonymous',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                  if (ts != null)
+                                    Text(
+                                      DateFormat('MMM d').format(ts),
+                                      style: const TextStyle(color: Colors.white24, fontSize: 11),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  data['reason']?.toString().toUpperCase() ?? 'OTHER',
+                                  style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                data['feedback'] ?? 'No additional feedback provided.',
+                                style: const TextStyle(color: Colors.white54, fontSize: 13, height: 1.4),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  const Text("Reason for leaving:", style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text(data['reason'] ?? 'No reason provided', style: const TextStyle(color: Colors.white70, fontStyle: FontStyle.italic)),
-                ],
+                ),
               ),
             );
           },

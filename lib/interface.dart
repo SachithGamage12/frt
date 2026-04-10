@@ -869,15 +869,26 @@ class _InterfacePageState extends State<InterfacePage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'FRT Tracking Hub',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
+        title: const Column(
+          children: [
+            Text(
+              'FRT Tracking Hub',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            Text(
+              'Live Secure Connection',
+              style: TextStyle(fontSize: 10, color: AppColors.primary, letterSpacing: 1.2),
+            ),
+          ],
         ),
         centerTitle: true,
-        backgroundColor: AppColors.primary,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            color: AppColors.background.withOpacity(0.8),
+            border: Border(bottom: BorderSide(color: Colors.white10)),
+          ),
         ),
         actions: [
           if (_userData != null && _userData!['profilePicture'] != null)
@@ -1177,9 +1188,16 @@ class _InterfacePageState extends State<InterfacePage>
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          colors: [AppColors.primary.withOpacity(0.15), AppColors.primary.withOpacity(0.05)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(color: AppColors.primary.withOpacity(0.05), blurRadius: 20, spreadRadius: 5),
+        ],
       ),
       child: Row(
         children: [
@@ -1218,64 +1236,108 @@ class _InterfacePageState extends State<InterfacePage>
   }
 
   Widget _buildFamilyMemberCard(Map<String, dynamic> member, int index) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white.withOpacity(0.08), Colors.transparent],
+        ),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Stack(
-          children: [
-            CircleAvatar(
-              backgroundImage: NetworkImage(member['profilePicture'] ?? ''),
-              radius: 28,
-              backgroundColor: Colors.white10,
-            ),
-            Positioned(
-              right: 2,
-              bottom: 2,
-              child: Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: Colors.green,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.background, width: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () {
+            if (member['locationData'] != null) {
+              _navigateToLocationView(
+                member['locationData'],
+                member['name'] ?? 'Unknown',
+                member['profilePicture'],
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Stack(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(colors: [AppColors.primary, AppColors.secondary]),
+                      ),
+                      child: CircleAvatar(
+                        backgroundImage: NetworkImage(member['profilePicture'] ?? ''),
+                        radius: 30,
+                        backgroundColor: AppColors.surface,
+                      ),
+                    ),
+                    Positioned(
+                      right: 4,
+                      bottom: 4,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00C853),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.background, width: 2),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        member['name'] ?? 'Unknown',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.link, size: 12, color: AppColors.primary.withOpacity(0.7)),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'Secure Connection',
+                            style: TextStyle(color: Colors.white38, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.call_outlined, color: AppColors.primary),
+                    onPressed: () => _initiateCall(member['userId'], member['name'] ?? 'Unknown'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right, color: Colors.white24),
+              ],
             ),
-          ],
-        ),
-        title: Text(
-          member['name'] ?? 'Unknown',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        subtitle: const Text(
-          'Connected • Tap to track',
-          style: TextStyle(color: Colors.white54, fontSize: 12),
-        ),
-        trailing: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.call, color: AppColors.primary, size: 20),
-            onPressed: () => _initiateCall(member['userId'], member['name'] ?? 'Unknown'),
           ),
         ),
-        onTap: () {
-          if (member['locationData'] != null) {
-            _navigateToLocationView(
-              member['locationData'],
-              member['name'] ?? 'Unknown',
-              member['profilePicture'],
-            );
-          }
-        },
       ),
     );
   }

@@ -186,7 +186,7 @@ class _PaymentPageState extends State<PaymentPage> {
     try {
       QuerySnapshot query = await FirebaseFirestore.instance
           .collection('users')
-          .where('generatedPromoCode', isEqualTo: code)
+          .where('promoCode', isEqualTo: code)
           .limit(1)
           .get();
 
