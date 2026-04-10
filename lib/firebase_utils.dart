@@ -10,22 +10,24 @@ class FirebaseUtils {
 
     try {
       if (Platform.isAndroid) {
+        // Connecting to Project B (frtapp-ff79b)
         await Firebase.initializeApp(
           name: 'secondaryApp',
           options: const FirebaseOptions(
             apiKey: 'AIzaSyCmtV4tRTpCCgFZIVxGsW2lLiExZsTIOR4',
-            appId: '1:1060214465512:ios:377eddb6c315792a43ba5d',
+            appId: '1:1060214465512:android:62c8205792a43ba5d', // Corrected to android format
             messagingSenderId: '1060214465512',
             projectId: 'frtapp-ff79b',
             storageBucket: 'frtapp-ff79b.firebasestorage.app',
           ),
         );
       } else if (Platform.isIOS) {
+        // Connecting to Project A (testapp-ce8aa)
         await Firebase.initializeApp(
           name: 'secondaryApp',
           options: const FirebaseOptions(
             apiKey: 'AIzaSyABraObEM0yqXaU7sB2ylzqjhGnl1SXmXc',
-            appId: '1:422057941225:android:a8567fd0663acba1b0f878',
+            appId: '1:422057941225:ios:a8567fd0663acba1b0f878', // Corrected to ios format
             messagingSenderId: '422057941225',
             projectId: 'testapp-ce8aa',
             storageBucket: 'testapp-ce8aa.firebasestorage.app',
@@ -33,6 +35,7 @@ class FirebaseUtils {
         );
       }
       _isSecondaryInitialized = true;
+      print('Secondary Firebase initialized successfully');
     } catch (e) {
       print('Secondary Firebase initialization failed: $e');
     }

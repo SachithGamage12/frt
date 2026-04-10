@@ -10,7 +10,9 @@ import flutter_foreground_task
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    FirebaseApp.configure()
+    if FirebaseApp.app() == nil {
+        FirebaseApp.configure()
+    }
     GMSServices.provideAPIKey("AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg")
     
     SwiftFlutterForegroundTaskPlugin.setPluginRegistrantCallback(registerPlugins)

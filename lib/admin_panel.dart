@@ -116,6 +116,10 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
             if (snapshot2.hasData && snapshot2.data != null) {
               allDocs.addAll(snapshot2.data!.docs);
             }
+            
+            // Deduplicate by ID (mobile number) to "merge" accounts
+            final seenIds = <String>{};
+            allDocs = allDocs.where((doc) => seenIds.add(doc.id)).toList();
 
             int totalUsers = allDocs.length;
             int activeSubscribers = allDocs.where((doc) {
@@ -241,6 +245,10 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
             if (snapshot2.hasData && snapshot2.data != null) {
               allDocs.addAll(snapshot2.data!.docs);
             }
+
+            // Deduplicate by ID
+            final seenApprovalIds = <String>{};
+            allDocs = allDocs.where((doc) => seenApprovalIds.add(doc.id)).toList();
 
             if (allDocs.isEmpty) {
               return const Center(child: Text('No pending approvals', style: TextStyle(color: Colors.white70)));
@@ -486,6 +494,10 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
             if (snapshot2.hasData && snapshot2.data != null) {
               allDocs.addAll(snapshot2.data!.docs);
             }
+
+            // Deduplicate by ID
+            final seenCancelIdsSet = <String>{};
+            allDocs = allDocs.where((doc) => seenCancelIdsSet.add(doc.id)).toList();
 
             allDocs.sort((a, b) {
               final valA = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;

@@ -886,6 +886,7 @@ class _InterfacePageState extends State<InterfacePage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8BBD0).withOpacity(0.1), // Very Light Purple/Pinkish background
       appBar: AppBar(
         title: const Column(
           children: [
@@ -940,7 +941,7 @@ class _InterfacePageState extends State<InterfacePage>
                     children: [
                       Text(
                         "Tracked Circles",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
                       ),
                       Spacer(),
                       Icon(Icons.people_outline, color: AppColors.primary),
@@ -963,12 +964,10 @@ class _InterfacePageState extends State<InterfacePage>
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.qr_code_2, size: 80, color: Colors.white24),
-                          SizedBox(height: 16),
-                          Text(
-                            'Scan QR codes to add family members',
-                            style: TextStyle(fontSize: 16, color: Colors.white54),
-                          ),
+                            Text(
+                              'Scan QR codes to add family members',
+                              style: TextStyle(fontSize: 16, color: Colors.black54),
+                            ),
                         ],
                       ),
                     ),
@@ -1322,7 +1321,7 @@ class _InterfacePageState extends State<InterfacePage>
                       Text(
                         member['name'] ?? 'Unknown',
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: Colors.black,
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),
@@ -1334,7 +1333,7 @@ class _InterfacePageState extends State<InterfacePage>
                           const SizedBox(width: 4),
                           const Text(
                             'Secure Connection',
-                            style: TextStyle(color: Colors.white38, fontSize: 11),
+                            style: TextStyle(color: Colors.black54, fontSize: 11),
                           ),
                         ],
                       ),

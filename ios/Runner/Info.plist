@@ -58,6 +58,8 @@
 	<string>We need access to your location to show it on the map.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>We need access to your location to provide continuous services.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>We need access to your location even in the background to ensure your family can track your safety.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
