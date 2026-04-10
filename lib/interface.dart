@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
@@ -9,6 +7,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+import 'dart:convert';
+import 'dart:async';
+
+// Internal Project Imports
 import 'user_details_page.dart';
 import 'location_view_page.dart';
 import 'call_page.dart';
@@ -1509,6 +1513,9 @@ void startLocationUpdates() async {
     print('Background secondary init error: $e');
   }
 
+  // Monitor Calls in Background
+  _startBackgroundCallMonitor(userId);
+
   StreamSubscription<Position>? positionStream;
   positionStream = Geolocator.getPositionStream(
     locationSettings: const LocationSettings(
@@ -1551,8 +1558,8 @@ void startLocationUpdates() async {
       }
 
       FlutterForegroundTask.updateService(
-        notificationTitle: 'Sharing Live Location',
-        notificationText: 'Your location is being shared with family members.',
+        notificationTitle: 'FRT: Sharing Location',
+        notificationText: 'Family members can see your live position.',
       );
     },
     onError: (e) {
@@ -1562,6 +1569,48 @@ void startLocationUpdates() async {
   );
 
   FlutterForegroundTask.setOnLockScreenVisibility(true);
+}
+
+void _startBackgroundCallMonitor(String userId) {
+  // Local Notifications Initialization
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/launcher_icon');
+  const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+  flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+  FirebaseFirestore.instance
+      .collection('calls')
+      .where('receiverId', isEqualTo: userId)
+      .snapshots()
+      .listen((snapshot) {
+    for (var change in snapshot.docChanges) {
+      if (change.type == DocumentChangeType.added) {
+        final data = change.doc.data();
+        if (data != null && data['status'] == 'ringing') {
+          // Play Ringtone
+          FlutterRingtonePlayer().playRingtone();
+          
+          // Show Local Notification
+          const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
+            'call_channel', 'Incoming Calls',
+            importance: Importance.max,
+            priority: Priority.high,
+            fullScreenIntent: true,
+          );
+          const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
+          flutterLocalNotificationsPlugin.show(
+            0, 'Incoming Call', 'Someone is calling you in FRT...',
+            platformChannelSpecifics,
+          );
+        }
+      } else if (change.type == DocumentChangeType.modified || change.type == DocumentChangeType.removed) {
+        final data = change.doc.data() as Map<String, dynamic>?;
+        if (data == null || data['status'] != 'ringing') {
+          FlutterRingtonePlayer().stop();
+        }
+      }
+    }
+  });
 }
 
 class ScannerOverlayPainter extends CustomPainter {

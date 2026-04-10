@@ -3,6 +3,7 @@ import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'style_utils.dart';
 
 class CallPage extends StatefulWidget {
@@ -33,6 +34,7 @@ class _CallPageState extends State<CallPage> {
   @override
   void initState() {
     super.initState();
+    FlutterRingtonePlayer().stop();
     _initAgora();
   }
 

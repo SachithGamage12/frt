@@ -259,6 +259,26 @@ class _LocationViewPageState extends State<LocationViewPage> {
       _isLocationAvailable = true; // Temporary reset
     });
     _startLiveTracking();
+    _fetchInitialPosition();
+  }
+
+  Future<void> _fetchInitialPosition() async {
+    try {
+      // Primary Project Fetch
+      var doc = await FirebaseFirestore.instance.collection('liveLocations').doc(widget.sharingId).get();
+      if (doc.exists && doc.data() != null) {
+        _processLocationSnapshot(doc.data());
+      } else if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
+        // Secondary Project Fetch fallback
+        var secDoc = await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp'))
+            .collection('liveLocations').doc(widget.sharingId).get();
+        if (secDoc.exists && secDoc.data() != null) {
+          _processLocationSnapshot(secDoc.data());
+        }
+      }
+    } catch (e) {
+      debugPrint('Initial position fetch error: $e');
+    }
   }
 
   void _processLocationSnapshot(Map<String, dynamic>? data) {
@@ -268,7 +288,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
     final lng = data['longitude'] as double?;
     final heading = data['heading'] as double? ?? 0;
 
-    if (lat != null && lng != null) {
+    if (lat != null && lng != null && (lat != 0 || lng != 0)) {
       final newPosition = LatLng(lat, lng);
 
       double distance = 0;

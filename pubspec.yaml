@@ -57,6 +57,8 @@ dependencies:
   agora_rtc_engine: ^6.5.3
   uuid: ^4.5.3
   package_info_plus: ^9.0.1
+  flutter_ringtone_player: ^4.0.0+4
+  flutter_local_notifications: ^17.2.2
   
 
 

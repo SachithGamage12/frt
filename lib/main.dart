@@ -350,59 +350,74 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       return;
     }
 
-    try {
-      final doc = await _firestore.collection('users').doc(_mobileController.text).get();
-      if (doc.exists && doc.data()?['password'] == _passwordController.text) {
-        final prefs = await SharedPreferences.getInstance();
-        if (_rememberMe) {
-          await prefs.setString('mobile', _mobileController.text);
-          await prefs.setString('password', _passwordController.text);
-          await prefs.setBool('rememberMe', true);
-        } else {
-          await prefs.remove('mobile');
-          await prefs.remove('password');
-          await prefs.setBool('rememberMe', false);
-        }
+    int retryCount = 0;
+    const int maxRetries = 3;
 
-        bool isUnlocked = doc.data()?['isAppUnlocked'] == true;
-        Timestamp? expiry = doc.data()?['subscriptionExpiry'] as Timestamp?;
-        
-        // Store FCM token (Safe fetch)
-        try {
-          String? token = await FirebaseMessaging.instance.getToken();
-          if (token != null) {
-            await _firestore.collection('users').doc(_mobileController.text).update({'fcmToken': token});
+    while (retryCount < maxRetries) {
+      try {
+        final doc = await _firestore.collection('users').doc(_mobileController.text).get();
+        if (doc.exists && doc.data()?['password'] == _passwordController.text) {
+          final prefs = await SharedPreferences.getInstance();
+          if (_rememberMe) {
+            await prefs.setString('mobile', _mobileController.text);
+            await prefs.setString('password', _passwordController.text);
+            await prefs.setBool('rememberMe', true);
+          } else {
+            await prefs.remove('mobile');
+            await prefs.remove('password');
+            await prefs.setBool('rememberMe', false);
           }
-        } catch (e) {
-          print("Skipping FCM token update: $e");
-        }
 
-        // Expiry Check
-        if (isUnlocked && expiry != null && expiry.toDate().isBefore(DateTime.now())) {
-          isUnlocked = false;
-          await _firestore.collection('users').doc(_mobileController.text).update({'isAppUnlocked': false});
-        }
+          bool isUnlocked = doc.data()?['isAppUnlocked'] == true;
+          Timestamp? expiry = doc.data()?['subscriptionExpiry'] as Timestamp?;
+          
+          try {
+            String? token = await FirebaseMessaging.instance.getToken();
+            if (token != null) {
+              await _firestore.collection('users').doc(_mobileController.text).update({'fcmToken': token});
+            }
+          } catch (e) {
+            print("Skipping FCM token update: $e");
+          }
 
-        if (isUnlocked) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => InterfacePage(userId: _mobileController.text),
-            ),
-          );
+          if (isUnlocked && expiry != null && expiry.toDate().isBefore(DateTime.now())) {
+            isUnlocked = false;
+            await _firestore.collection('users').doc(_mobileController.text).update({'isAppUnlocked': false});
+          }
+
+          if (isUnlocked) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => InterfacePage(userId: _mobileController.text)),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PaymentPage(userId: _mobileController.text, userData: doc.data() as Map<String, dynamic>),
+              ),
+            );
+          }
+          return; // Success
         } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PaymentPage(userId: _mobileController.text, userData: doc.data() as Map<String, dynamic>),
-            ),
-          );
+          AppAlerts.show(context, 'Invalid mobile number or password', isError: true);
+          return; // User error, don't retry
         }
-      } else {
-        AppAlerts.show(context, 'Invalid mobile number or password', isError: true);
+      } catch (e) {
+        String errorStr = e.toString().toLowerCase();
+        if (errorStr.contains('unavailable') || errorStr.contains('network') || errorStr.contains('deadline')) {
+          retryCount++;
+          if (retryCount < maxRetries) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Mobile data slow. Retrying ($retryCount/$maxRetries)...')),
+            );
+            await Future.delayed(const Duration(seconds: 3));
+            continue; // Loop again
+          }
+        }
+        AppAlerts.show(context, 'Error: $e', isError: true);
+        return;
       }
-    } catch (e) {
-      AppAlerts.show(context, 'Error: $e', isError: true);
     }
   }
 
