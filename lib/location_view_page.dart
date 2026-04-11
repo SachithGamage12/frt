@@ -303,7 +303,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
         );
       }
 
-      if (distance > 5 || _rawPoints.isEmpty) {
+      if (distance > 1 || _rawPoints.isEmpty) {
         setState(() {
           _rawPoints.add(newPosition);
           _pathPoints.add(newPosition);

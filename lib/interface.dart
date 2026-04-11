@@ -568,7 +568,7 @@ class _InterfacePageState extends State<InterfacePage>
     _positionStream = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 5,
+        distanceFilter: 0,
       ),
     ).listen(
       (Position position) async {
@@ -1677,7 +1677,7 @@ void startLocationUpdates() async {
         await Firebase.initializeApp(
           name: 'secondaryApp',
           options: const FirebaseOptions(
-            apiKey: 'AIzaSyCmtV4tRTpCCgFZIVxGsW2lLiExZsTIOR4',
+            apiKey: 'AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg',
             appId: '1:1060214465512:android:62c8205792a43ba5d',
             messagingSenderId: '1060214465512',
             projectId: 'frtapp-ff79b',
@@ -1688,7 +1688,7 @@ void startLocationUpdates() async {
         await Firebase.initializeApp(
           name: 'secondaryApp',
           options: const FirebaseOptions(
-            apiKey: 'AIzaSyABraObEM0yqXaU7sB2ylzqjhGnl1SXmXc',
+            apiKey: 'AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg',
             appId: '1:422057941225:ios:a8567fd0663acba1b0f878',
             messagingSenderId: '422057941225',
             projectId: 'testapp-ce8aa',
@@ -1708,7 +1708,7 @@ void startLocationUpdates() async {
   positionStream = Geolocator.getPositionStream(
     locationSettings: const LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 5,
+      distanceFilter: 0,
     ),
   ).listen(
     (Position position) async {

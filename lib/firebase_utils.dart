@@ -14,7 +14,7 @@ class FirebaseUtils {
         await Firebase.initializeApp(
           name: 'secondaryApp',
           options: const FirebaseOptions(
-            apiKey: 'AIzaSyCmtV4tRTpCCgFZIVxGsW2lLiExZsTIOR4',
+            apiKey: 'AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg',
             appId: '1:1060214465512:android:62c8205792a43ba5d', // Corrected to android format
             messagingSenderId: '1060214465512',
             projectId: 'frtapp-ff79b',
@@ -26,7 +26,7 @@ class FirebaseUtils {
         await Firebase.initializeApp(
           name: 'secondaryApp',
           options: const FirebaseOptions(
-            apiKey: 'AIzaSyABraObEM0yqXaU7sB2ylzqjhGnl1SXmXc',
+            apiKey: 'AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg',
             appId: '1:422057941225:ios:a8567fd0663acba1b0f878', // Corrected to ios format
             messagingSenderId: '422057941225',
             projectId: 'testapp-ce8aa',
