@@ -45,6 +45,8 @@ class _InterfacePageState extends State<InterfacePage>
   bool _isCallDialogShowing = false;
 
   bool _isHandlingQr = false;
+  int _tourStep = 0;
+  bool _showTour = false;
 
   @override
   void initState() {
@@ -58,6 +60,26 @@ class _InterfacePageState extends State<InterfacePage>
     _requestBatteryOptimization();
     _resumeLiveLocationSharing();
     _listenForIncomingCalls();
+    _checkFirstTime();
+  }
+
+  Future<void> _checkFirstTime() async {
+    final prefs = await SharedPreferences.getInstance();
+    bool hasSeenTour = prefs.getBool('hasSeenTour') ?? false;
+    if (!hasSeenTour) {
+      setState(() {
+        _showTour = true;
+        _tourStep = 1;
+      });
+    }
+  }
+
+  Future<void> _completeTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenTour', true);
+    setState(() {
+      _showTour = false;
+    });
   }
 
   void _listenForIncomingCalls() {
@@ -72,6 +94,13 @@ class _InterfacePageState extends State<InterfacePage>
           _isCallDialogShowing = true;
           _showIncomingCallDialog(data);
         }
+      } else {
+        // Call document deleted (Hangup)
+        if (_isCallDialogShowing && mounted) {
+          Navigator.of(context, rootNavigator: true).pop(); // Dismiss dialog
+          _isCallDialogShowing = false;
+        }
+        FlutterRingtonePlayer().stop();
       }
     });
   }
@@ -298,18 +327,33 @@ class _InterfacePageState extends State<InterfacePage>
       final exists = _familyMembers.any((member) => member['userId'] == userId);
 
       if (!exists) {
+        final connectionData = {
+          'userId': userId,
+          'name': userData['name'],
+          'profilePicture': userData['profilePicture'],
+          'locationData': userData['locationData'],
+          'timestamp': FieldValue.serverTimestamp(),
+        };
+
         await FirebaseFirestore.instance
             .collection('users')
             .doc(widget.userId)
             .collection('familyMembers')
             .doc(userId)
-            .set({
-              'userId': userId,
-              'name': userData['name'],
-              'profilePicture': userData['profilePicture'],
-              'locationData': userData['locationData'],
-              'timestamp': FieldValue.serverTimestamp(),
-            });
+            .set(connectionData);
+
+        // Secondary
+        final secFirestore = FirebaseUtils.secondaryFirestore;
+        if (secFirestore != null) {
+          try {
+            await secFirestore
+                .collection('users')
+                .doc(widget.userId)
+                .collection('familyMembers')
+                .doc(userId)
+                .set(connectionData);
+          } catch (_) {}
+        }
 
         await _loadFamilyMembers();
       }
@@ -572,6 +616,8 @@ class _InterfacePageState extends State<InterfacePage>
       return jsonEncode({
         'type': 'live',
         'sharingId': sharingId,
+        'latitude': lat,
+        'longitude': lng,
         'userId': widget.userId,
         'userName': _userData?['name'] ?? 'Unknown',
         'profilePicture': _userData?['profilePicture'],
@@ -641,10 +687,11 @@ class _InterfacePageState extends State<InterfacePage>
 
     if (_showPopup) {
       if (_isSharingLiveLocation && _liveLocationSharingId != null) {
+        Position pos = await Geolocator.getCurrentPosition();
         setState(() {
           _locationData = _encodeLocationData(
-            0,
-            0,
+            pos.latitude,
+            pos.longitude,
             isLive: true,
             sharingId: _liveLocationSharingId,
           );
@@ -951,6 +998,9 @@ class _InterfacePageState extends State<InterfacePage>
                   ),
               ],
             ),
+          // App Tour Overlay
+          if (_showTour)
+            _buildTourOverlay(),
           Positioned(
             bottom: 20,
             right: 20,
@@ -1254,9 +1304,32 @@ class _InterfacePageState extends State<InterfacePage>
     );
 
     if (confirmed == true) {
+      final memberToDelete = _familyMembers[index];
       setState(() {
         _familyMembers.removeAt(index);
       });
+      
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(widget.userId)
+            .collection('familyMembers')
+            .doc(memberToDelete['userId'])
+            .delete();
+            
+        final secFirestore = FirebaseUtils.secondaryFirestore;
+        if (secFirestore != null) {
+          await secFirestore
+              .collection('users')
+              .doc(widget.userId)
+              .collection('familyMembers')
+              .doc(memberToDelete['userId'])
+              .delete();
+        }
+      } catch (e) {
+        debugPrint('Error deleting connection from Firestore: $e');
+      }
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('family_members', jsonEncode(_familyMembers));
     }
@@ -1459,6 +1532,121 @@ class _InterfacePageState extends State<InterfacePage>
       ),
     );
   }
+
+  Widget _buildTourOverlay() {
+    String title = "";
+    String description = "";
+    Alignment alignment = Alignment.center;
+
+    switch (_tourStep) {
+      case 1:
+        title = "Welcome to FRT!";
+        description = "Let's take a quick look at how to secure your family.";
+        alignment = Alignment.center;
+        break;
+      case 2:
+        title = "Share Your Location";
+        description = "Tap the Green button below to generate your QR code and start sharing live.";
+        alignment = Alignment.bottomRight;
+        break;
+      case 3:
+        title = "Scan Connections";
+        description = "Tap 'Scan QR Code' from the menu to add family members to your circles.";
+        alignment = Alignment.bottomCenter;
+        break;
+      case 4:
+        title = "Track Circles";
+        description = "Your added family members will appear here. Tap any card to view them on the map.";
+        alignment = Alignment.center;
+        break;
+      case 5:
+        title = "Manage Profile";
+        description = "Tap your avatar at the top right to manage your subscription and settings.";
+        alignment = Alignment.topRight;
+        break;
+    }
+
+    return GestureDetector(
+      onTap: () {
+        if (_tourStep < 5) {
+          setState(() => _tourStep++);
+        } else {
+          _completeTour();
+        }
+      },
+      child: Container(
+        color: Colors.black.withOpacity(0.85),
+        child: Stack(
+          children: [
+            Align(
+              alignment: alignment,
+              child: Padding(
+                padding: const EdgeInsets.all(40.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_tourStep > 1)
+                      const Icon(Icons.arrow_upward, color: AppColors.primary, size: 40),
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                        boxShadow: [
+                          BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 30),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            description,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white70, fontSize: 15),
+                          ),
+                          const SizedBox(height: 24),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              TextButton(
+                                onPressed: _completeTour,
+                                child: const Text("End Tour", style: TextStyle(color: Colors.white38)),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  if (_tourStep < 5) {
+                                    setState(() => _tourStep++);
+                                  } else {
+                                    _completeTour();
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.black,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                child: Text(_tourStep == 5 ? "Finish" : "Next"),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 void startLocationUpdates() async {
@@ -1604,10 +1792,7 @@ void _startBackgroundCallMonitor(String userId) {
           );
         }
       } else if (change.type == DocumentChangeType.modified || change.type == DocumentChangeType.removed) {
-        final data = change.doc.data() as Map<String, dynamic>?;
-        if (data == null || data['status'] != 'ringing') {
-          FlutterRingtonePlayer().stop();
-        }
+        FlutterRingtonePlayer().stop();
       }
     }
   });

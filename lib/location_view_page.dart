@@ -85,7 +85,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
     _polylines.clear();
     _circles.clear();
 
-    if (!widget.isLive) {
+    if (widget.latitude != 0 || widget.longitude != 0) {
       _addMarker(initialPosition);
       _updateCamera(initialPosition);
     }
@@ -241,9 +241,11 @@ class _LocationViewPageState extends State<LocationViewPage> {
       });
     }
 
-    // Use a timer to show 'unavailable' if NO data is received within 5 seconds
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && _markers.isEmpty) {
+    // Use a timer to show 'unavailable' if NO live updates are received
+    Future.delayed(const Duration(seconds: 10), () {
+      if (mounted && _rawPoints.isEmpty) {
+        // We only show unavailable if we haven't received ANY live movement updates
+        // BUT we still have the initial marker from the QR code.
         setState(() => _isLocationAvailable = false);
       }
     });
@@ -284,9 +286,9 @@ class _LocationViewPageState extends State<LocationViewPage> {
   void _processLocationSnapshot(Map<String, dynamic>? data) {
     if (data == null || !mounted) return;
     
-    final lat = data['latitude'] as double?;
-    final lng = data['longitude'] as double?;
-    final heading = data['heading'] as double? ?? 0;
+    final lat = data['latitude'] is int ? (data['latitude'] as int).toDouble() : data['latitude'] as double?;
+    final lng = data['longitude'] is int ? (data['longitude'] as int).toDouble() : data['longitude'] as double?;
+    final heading = data['heading']?.toDouble() ?? 0.0;
 
     if (lat != null && lng != null && (lat != 0 || lng != 0)) {
       final newPosition = LatLng(lat, lng);
