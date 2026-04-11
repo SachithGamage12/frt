@@ -45,7 +45,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
   Timer? _snapTimer; // Timer for periodic snapping
 
   // Google Maps API key (replace with your key if different)
-  static const String _googleApiKey = 'AIzaSyD5IB_VkfMz3avSYzIoS-UbcvNpt7cZD7M';
+  static const String _googleApiKey = 'AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg';
 
   @override
   void initState() {

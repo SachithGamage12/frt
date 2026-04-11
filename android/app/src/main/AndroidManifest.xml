@@ -30,7 +30,7 @@
         <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyD5IB_VkfMz3avSYzIoS-UbcvNpt7cZD7M" />
+            android:value="AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg" />
 
         <!-- Foreground service declaration for flutter_foreground_task -->
         <service
