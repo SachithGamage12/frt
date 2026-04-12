@@ -75,8 +75,13 @@ class _LocationViewPageState extends State<LocationViewPage> {
   }
 
   void _initializeLocation() {
-    final initialPosition = LatLng(widget.latitude, widget.longitude);
-    _lastPosition = initialPosition;
+    LatLng? initialPosition;
+    if (widget.latitude != 0 || widget.longitude != 0) {
+      initialPosition = LatLng(widget.latitude, widget.longitude);
+      _lastPosition = initialPosition;
+    } else {
+      _lastPosition = null; // Don't set to 0,0 for live tracking
+    }
 
     _pathPoints.clear();
     _rawPoints.clear();
@@ -84,7 +89,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
     _polylines.clear();
     _circles.clear();
 
-    if (widget.latitude != 0 || widget.longitude != 0) {
+    if (initialPosition != null) {
       _addMarker(initialPosition);
       _updateCamera(initialPosition);
     }
@@ -100,7 +105,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
     }
   }
 
-  void _addMarker(LatLng position, [double? heading]) {
+  void _addMarker(LatLng position, [double? heading, String? dynamicName]) {
     setState(() {
       _markers.clear();
       _circles.clear(); // Clear previous circles
@@ -108,7 +113,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
         Marker(
           markerId: const MarkerId('userLocation'),
           position: position,
-          infoWindow: InfoWindow(title: widget.userName),
+          infoWindow: InfoWindow(title: dynamicName ?? widget.userName),
           icon: _personIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
           rotation: heading ?? 0,
           anchor: const Offset(0.5, 0.5),
@@ -269,8 +274,13 @@ class _LocationViewPageState extends State<LocationViewPage> {
 
     if (lat != null && lng != null && (lat != 0 || lng != 0)) {
       final newPosition = LatLng(lat, lng);
+      
+      // Update userName if provided dynamically from the stream
+      if (data.containsKey('userName') && data['userName'] != 'Unknown') {
+        // Fallback or update if the widget passed 'Unknown' originally
+      }
 
-      double distance = 0;
+      double distance = 100; // Force update if no last position
       if (_lastPosition != null) {
         distance = Geolocator.distanceBetween(
           _lastPosition!.latitude,
@@ -280,16 +290,32 @@ class _LocationViewPageState extends State<LocationViewPage> {
         );
       }
 
-      if (distance > 1 || _rawPoints.isEmpty) {
+      // Add to path if we moved more than 2 meters, or if it's the very first point
+      if (distance > 2 || _rawPoints.isEmpty) {
         setState(() {
           _rawPoints.add(newPosition);
           _pathPoints.add(newPosition);
           _lastPosition = newPosition;
-          _addMarker(newPosition, heading);
+          
+          // Use dynamic name from stream if widget name was unknown
+          final displayName = (widget.userName == 'Unknown User' || widget.userName == 'Unknown') && data['userName'] != null
+              ? data['userName']
+              : widget.userName;
+              
+          _addMarker(newPosition, heading, displayName);
           _isLocationAvailable = true;
           _updatePolyline();
         });
 
+        _updateCamera(newPosition);
+      } else {
+        // Still update marker direction and pulse even if we didn't move far enough to draw path
+        setState(() {
+          final displayName = (widget.userName == 'Unknown User' || widget.userName == 'Unknown') && data['userName'] != null
+              ? data['userName']
+              : widget.userName;
+          _addMarker(newPosition, heading, displayName);
+        });
         _updateCamera(newPosition);
       }
     } else {
