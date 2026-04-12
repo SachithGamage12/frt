@@ -17,7 +17,6 @@ import 'user_details_page.dart';
 import 'location_view_page.dart';
 import 'call_page.dart';
 import 'style_utils.dart';
-import 'firebase_utils.dart';
 
 class InterfacePage extends StatefulWidget {
   final String userId;
@@ -52,7 +51,6 @@ class _InterfacePageState extends State<InterfacePage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    FirebaseUtils.initializeSecondaryApp();
     _initForegroundTask();
     _fetchUserData();
     _checkLocationPermission();
@@ -342,19 +340,6 @@ class _InterfacePageState extends State<InterfacePage>
             .doc(userId)
             .set(connectionData);
 
-        // Secondary
-        final secFirestore = FirebaseUtils.secondaryFirestore;
-        if (secFirestore != null) {
-          try {
-            await secFirestore
-                .collection('users')
-                .doc(widget.userId)
-                .collection('familyMembers')
-                .doc(userId)
-                .set(connectionData);
-          } catch (_) {}
-        }
-
         await _loadFamilyMembers();
       }
     } catch (e) {
@@ -557,11 +542,7 @@ class _InterfacePageState extends State<InterfacePage>
       'userName': _userData?['name'] ?? 'Unknown',
       'profilePicture': _userData?['profilePicture'],
     };
-    try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locData); } catch(_) {}
-    final secFirestore = FirebaseUtils.secondaryFirestore;
-    if (secFirestore != null) {
-      try { await secFirestore.collection('liveLocations').doc(sharingId).set(locData); } catch(_) {}
-    }
+        try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locData); } catch(_) {}
 
     // Start position stream
     _positionStream?.cancel();
@@ -583,10 +564,6 @@ class _InterfacePageState extends State<InterfacePage>
           'profilePicture': _userData?['profilePicture'],
         };
         try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locUpdate); } catch(_) {}
-        final secFirestore = FirebaseUtils.secondaryFirestore;
-        if (secFirestore != null) {
-          try { await secFirestore.collection('liveLocations').doc(sharingId).set(locUpdate); } catch(_) {}
-        }
       },
       onError: (e) {
         print('Position stream error: $e');
@@ -1316,16 +1293,6 @@ class _InterfacePageState extends State<InterfacePage>
             .collection('familyMembers')
             .doc(memberToDelete['userId'])
             .delete();
-            
-        final secFirestore = FirebaseUtils.secondaryFirestore;
-        if (secFirestore != null) {
-          await secFirestore
-              .collection('users')
-              .doc(widget.userId)
-              .collection('familyMembers')
-              .doc(memberToDelete['userId'])
-              .delete();
-        }
       } catch (e) {
         debugPrint('Error deleting connection from Firestore: $e');
       }
@@ -1670,37 +1637,6 @@ void startLocationUpdates() async {
     return;
   }
 
-  // Initialize Secondary Firebase for background task
-  try {
-    if (!Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-      if (Platform.isAndroid) {
-        await Firebase.initializeApp(
-          name: 'secondaryApp',
-          options: const FirebaseOptions(
-            apiKey: 'AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg',
-            appId: '1:1060214465512:android:62c8205792a43ba5d',
-            messagingSenderId: '1060214465512',
-            projectId: 'frtapp-ff79b',
-            storageBucket: 'frtapp-ff79b.firebasestorage.app',
-          ),
-        );
-      } else if (Platform.isIOS) {
-        await Firebase.initializeApp(
-          name: 'secondaryApp',
-          options: const FirebaseOptions(
-            apiKey: 'AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg',
-            appId: '1:422057941225:ios:a8567fd0663acba1b0f878',
-            messagingSenderId: '422057941225',
-            projectId: 'testapp-ce8aa',
-            storageBucket: 'testapp-ce8aa.firebasestorage.app',
-          ),
-        );
-      }
-    }
-  } catch (e) {
-    print('Background secondary init error: $e');
-  }
-
   // Monitor Calls in Background
   _startBackgroundCallMonitor(userId);
 
@@ -1733,17 +1669,7 @@ void startLocationUpdates() async {
         print('Background primary write error: $e');
       }
 
-      // Write to Secondary
-      try {
-        if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-          await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp'))
-              .collection('liveLocations')
-              .doc(sharingId)
-              .set(locData);
-        }
-      } catch (e) {
-        print('Background secondary write error: $e');
-      }
+      // Write to Primary (Unified)
 
       FlutterForegroundTask.updateService(
         notificationTitle: 'FRT: Sharing Location',

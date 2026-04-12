@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "422057941225",
-    "project_id": "testapp-ce8aa",
-    "storage_bucket": "testapp-ce8aa.firebasestorage.app"
+    "project_number": "1060214465512",
+    "project_id": "frtapp-ff79b",
+    "storage_bucket": "frtapp-ff79b.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:422057941225:android:a8567fd0663acba1b0f878",
+        "mobilesdk_app_id": "1:1060214465512:android:8ed5f9ae4318fa2543ba5d",
         "android_client_info": {
           "package_name": "com.example.test_app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyABraObEM0yqXaU7sB2ylzqjhGnl1SXmXc"
+          "current_key": "AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg"
         }
       ],
       "services": {

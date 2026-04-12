@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'style_utils.dart';
 
@@ -105,19 +104,9 @@ class _CallPageState extends State<CallPage> {
     // Clear ringing state from Firestore from BOTH primary and secondary apps
     final String targetId = widget.isCaller ? widget.calleeId : widget.callerId;
     
-    // Primary
+    // Primary (Unified)
     try { 
       await FirebaseFirestore.instance.collection('calls').doc(targetId).delete(); 
-    } catch(_) {}
-    
-    // Secondary
-    try {
-      if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-        await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp'))
-            .collection('calls')
-            .doc(targetId)
-            .delete();
-      }
     } catch(_) {}
     
     if (mounted) {

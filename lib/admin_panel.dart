@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:math' as math;
 import 'style_utils.dart';
-import 'firebase_utils.dart';
 
 class AdminPanelPage extends StatefulWidget {
   const AdminPanelPage({super.key});
@@ -21,7 +20,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    FirebaseUtils.initializeSecondaryApp();
   }
 
   @override
@@ -462,18 +460,10 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
           'isFirstLoginAfterApprove': true,
         };
         try { await _firestore.collection('users').doc(userId).update(updateData); } catch(_) {}
-        final secFirestore = FirebaseUtils.secondaryFirestore;
-        if (secFirestore != null) {
-          try { await secFirestore.collection('users').doc(userId).update(updateData); } catch(_) {}
-        }
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account Approved! Notification Sent.')));
         AppAlerts.show(context, 'Account Approved! Notification Sent.');
       } else {
         try { await _firestore.collection('users').doc(userId).update({ 'paymentStatus': 'rejected' }); } catch(_) {}
-        final secFirestore = FirebaseUtils.secondaryFirestore;
-        if (secFirestore != null) {
-          try { await secFirestore.collection('users').doc(userId).update({ 'paymentStatus': 'rejected' }); } catch(_) {}
-        }
         AppAlerts.show(context, 'Account Rejected.');
       }
     } catch (e) {
@@ -484,39 +474,20 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   Widget _buildCancellationsList() {
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore.collection('cancellations').orderBy('timestamp', descending: true).snapshots(),
-      builder: (context, snapshot1) {
-        return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseUtils.secondaryFirestore?.collection('cancellations').orderBy('timestamp', descending: true).snapshots() ?? const Stream.empty(),
-          builder: (context, snapshot2) {
-            if (!snapshot1.hasData) return const Center(child: CircularProgressIndicator());
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
-            var allDocs = [...snapshot1.data!.docs];
-            if (snapshot2.hasData && snapshot2.data != null) {
-              allDocs.addAll(snapshot2.data!.docs);
-            }
+        final allDocs = snapshot.data!.docs;
 
-            // Deduplicate by ID
-            final seenCancelIdsSet = <String>{};
-            allDocs = allDocs.where((doc) => seenCancelIdsSet.add(doc.id)).toList();
+        if (allDocs.isEmpty) {
+          return const Center(child: Text('No cancellation records', style: TextStyle(color: Colors.white70)));
+        }
 
-            allDocs.sort((a, b) {
-              final valA = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-              final valB = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-              if (valA == null && valB == null) return 0;
-              if (valA == null) return 1;
-              if (valB == null) return -1;
-              return valB.compareTo(valA);
-            });
-
-            if (allDocs.isEmpty) {
-              return const Center(child: Text('No cancellation records', style: TextStyle(color: Colors.white70)));
-            }
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: allDocs.length,
-              itemBuilder: (context, index) {
-                var doc = allDocs[index];
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: allDocs.length,
+          itemBuilder: (context, index) {
+            var doc = allDocs[index];
             var data = doc.data() as Map<String, dynamic>;
             DateTime? ts = (data['timestamp'] as Timestamp?)?.toDate();
 
@@ -570,7 +541,7 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                data['feedback'] ?? 'No additional feedback provided.',
+                                data['feedback'] ?? 'No feedback provided.',
                                 style: const TextStyle(color: Colors.white54, fontSize: 13, height: 1.4),
                               ),
                             ],
@@ -582,8 +553,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
                 ),
               ),
             );
-          },
-        );
           },
         );
       },

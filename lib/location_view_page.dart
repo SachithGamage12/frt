@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'style_utils.dart';
@@ -215,9 +214,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
 
   void _startLiveTracking() {
     _locationSubscription?.cancel();
-    _secondarySubscription?.cancel();
-    
-    // Listen to PRIMARY project
+    // Listen to PRIMARY project (Unified)
     _locationSubscription = FirebaseFirestore.instance
         .collection('liveLocations')
         .doc(widget.sharingId)
@@ -228,18 +225,6 @@ class _LocationViewPageState extends State<LocationViewPage> {
       }
     });
 
-    // Simultaneously listen to SECONDARY project if initialized
-    if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-      _secondarySubscription = FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp'))
-          .collection('liveLocations')
-          .doc(widget.sharingId)
-          .snapshots()
-          .listen((snapshot) {
-        if (snapshot.exists && snapshot.data() != null) {
-          _processLocationSnapshot(snapshot.data());
-        }
-      });
-    }
 
     // Use a timer to show 'unavailable' if NO live updates are received
     Future.delayed(const Duration(seconds: 10), () {
@@ -251,7 +236,6 @@ class _LocationViewPageState extends State<LocationViewPage> {
     });
   }
 
-  StreamSubscription<DocumentSnapshot>? _secondarySubscription;
 
   void _reconnect() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -270,13 +254,6 @@ class _LocationViewPageState extends State<LocationViewPage> {
       var doc = await FirebaseFirestore.instance.collection('liveLocations').doc(widget.sharingId).get();
       if (doc.exists && doc.data() != null) {
         _processLocationSnapshot(doc.data());
-      } else if (Firebase.apps.any((app) => app.name == 'secondaryApp')) {
-        // Secondary Project Fetch fallback
-        var secDoc = await FirebaseFirestore.instanceFor(app: Firebase.app('secondaryApp'))
-            .collection('liveLocations').doc(widget.sharingId).get();
-        if (secDoc.exists && secDoc.data() != null) {
-          _processLocationSnapshot(secDoc.data());
-        }
       }
     } catch (e) {
       debugPrint('Initial position fetch error: $e');
