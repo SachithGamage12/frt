@@ -104,32 +104,22 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   Widget _buildDashboard() {
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore.collection('users').snapshots(),
-      builder: (context, snapshot1) {
-        return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseUtils.secondaryFirestore?.collection('users').snapshots() ?? const Stream.empty(),
-          builder: (context, snapshot2) {
-            if (!snapshot1.hasData) return const Center(child: CircularProgressIndicator());
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
-            var allDocs = [...snapshot1.data!.docs];
-            if (snapshot2.hasData && snapshot2.data != null) {
-              allDocs.addAll(snapshot2.data!.docs);
-            }
-            
-            // Deduplicate by ID (mobile number) to "merge" accounts
-            final seenIds = <String>{};
-            allDocs = allDocs.where((doc) => seenIds.add(doc.id)).toList();
+        final allDocs = snapshot.data!.docs;
+        
+        int totalUsers = allDocs.length;
+        int activeSubscribers = allDocs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          if (data['subscriptionExpiry'] == null) return false;
+          return (data['subscriptionExpiry'] as Timestamp).toDate().isAfter(DateTime.now());
+        }).length;
 
-            int totalUsers = allDocs.length;
-            int activeSubscribers = allDocs.where((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              if (data['subscriptionExpiry'] == null) return false;
-              return (data['subscriptionExpiry'] as Timestamp).toDate().isAfter(DateTime.now());
-            }).length;
-
-            int pendingApprovals = allDocs.where((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              return data['paymentStatus'] == 'pending';
-            }).length;
+        int pendingApprovals = allDocs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return data['paymentStatus'] == 'pending';
+        }).length;
 
         double totalRevenue = activeSubscribers * 350.0;
 
@@ -154,8 +144,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
               ),
             ],
           ),
-        );
-          },
         );
       },
     );
@@ -233,29 +221,19 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
   Widget _buildApprovalsList() {
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore.collection('users').where('paymentStatus', isEqualTo: 'pending').snapshots(),
-      builder: (context, snapshot1) {
-        return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseUtils.secondaryFirestore?.collection('users').where('paymentStatus', isEqualTo: 'pending').snapshots() ?? const Stream.empty(),
-          builder: (context, snapshot2) {
-            if (!snapshot1.hasData) return const Center(child: CircularProgressIndicator());
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
-            var allDocs = [...snapshot1.data!.docs];
-            if (snapshot2.hasData && snapshot2.data != null) {
-              allDocs.addAll(snapshot2.data!.docs);
-            }
+        final allDocs = snapshot.data!.docs;
 
-            // Deduplicate by ID
-            final seenApprovalIds = <String>{};
-            allDocs = allDocs.where((doc) => seenApprovalIds.add(doc.id)).toList();
+        if (allDocs.isEmpty) {
+          return const Center(child: Text('No pending approvals', style: TextStyle(color: Colors.white70)));
+        }
 
-            if (allDocs.isEmpty) {
-              return const Center(child: Text('No pending approvals', style: TextStyle(color: Colors.white70)));
-            }
-
-            return ListView.builder(
-              itemCount: allDocs.length,
-              itemBuilder: (context, index) {
-                var userDoc = allDocs[index];
+        return ListView.builder(
+          itemCount: allDocs.length,
+          itemBuilder: (context, index) {
+            var userDoc = allDocs[index];
             var data = userDoc.data() as Map<String, dynamic>;
 
             return AnimatedContainer(
@@ -304,8 +282,6 @@ class _AdminPanelPageState extends State<AdminPanelPage> with SingleTickerProvid
                 onTap: () => _showApprovalDialog(userDoc.id, data),
               ),
             );
-          },
-        );
           },
         );
       },
