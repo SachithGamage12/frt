@@ -1,4 +1,3 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -115,10 +114,6 @@ class _InterfacePageState extends State<InterfacePage>
             onPressed: () async {
               // Decline
               try { await FirebaseFirestore.instance.collection('calls').doc(widget.userId).delete(); } catch(_) {}
-              final secFirestore = FirebaseUtils.secondaryFirestore;
-              if (secFirestore != null) {
-                try { await secFirestore.collection('calls').doc(widget.userId).delete(); } catch(_) {}
-              }
               if (mounted) {
                 Navigator.pop(context);
               }
@@ -162,10 +157,6 @@ class _InterfacePageState extends State<InterfacePage>
     };
 
     try { await FirebaseFirestore.instance.collection('calls').doc(targetUserId).set(callData); } catch(_) {}
-    final secFirestore = FirebaseUtils.secondaryFirestore;
-    if (secFirestore != null) {
-      try { await secFirestore.collection('calls').doc(targetUserId).set(callData); } catch(_) {}
-    }
 
     if (mounted) {
       Navigator.push(
@@ -618,10 +609,6 @@ class _InterfacePageState extends State<InterfacePage>
   Future<void> _stopLiveLocationSharing() async {
     if (_liveLocationSharingId != null) {
       try { await FirebaseFirestore.instance.collection('liveLocations').doc(_liveLocationSharingId).delete(); } catch(_) {}
-      final secFirestore = FirebaseUtils.secondaryFirestore;
-      if (secFirestore != null) {
-        try { await secFirestore.collection('liveLocations').doc(_liveLocationSharingId).delete(); } catch(_) {}
-      }
       
       // Clear the stored sharingId
       await FirebaseFirestore.instance
