@@ -550,17 +550,22 @@ class _InterfacePageState extends State<InterfacePage>
 
     // Get initial position and save to Firestore
     Position initialPosition = await Geolocator.getCurrentPosition();
+    final sSpeed = initialPosition.speed.isNaN || initialPosition.speed.isInfinite ? 0.0 : initialPosition.speed;
+    final sHeading = initialPosition.heading.isNaN || initialPosition.heading.isInfinite ? 0.0 : initialPosition.heading;
+    final sLat = initialPosition.latitude.isNaN || initialPosition.latitude.isInfinite ? 0.0 : initialPosition.latitude;
+    final sLng = initialPosition.longitude.isNaN || initialPosition.longitude.isInfinite ? 0.0 : initialPosition.longitude;
+
     final locData = {
       'userId': widget.userId,
-      'latitude': initialPosition.latitude,
-      'longitude': initialPosition.longitude,
-      'heading': initialPosition.heading,
-      'speed': initialPosition.speed,
+      'latitude': sLat,
+      'longitude': sLng,
+      'heading': sHeading,
+      'speed': sSpeed,
       'timestamp': FieldValue.serverTimestamp(),
       'userName': _userData?['name'] ?? 'Unknown',
       'profilePicture': _userData?['profilePicture'],
     };
-        try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locData); } catch(_) {}
+        try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locData); } catch(e) { debugPrint("Init write error: $e"); }
 
     // Start position stream
     _positionStream?.cancel();
@@ -571,17 +576,22 @@ class _InterfacePageState extends State<InterfacePage>
       ),
     ).listen(
       (Position position) async {
+        final speed = position.speed.isNaN || position.speed.isInfinite ? 0.0 : position.speed;
+        final heading = position.heading.isNaN || position.heading.isInfinite ? 0.0 : position.heading;
+        final lat = position.latitude.isNaN || position.latitude.isInfinite ? 0.0 : position.latitude;
+        final lng = position.longitude.isNaN || position.longitude.isInfinite ? 0.0 : position.longitude;
+
         final locUpdate = {
           'userId': widget.userId,
-          'latitude': position.latitude,
-          'longitude': position.longitude,
-          'heading': position.heading,
-          'speed': position.speed,
+          'latitude': lat,
+          'longitude': lng,
+          'heading': heading,
+          'speed': speed,
           'timestamp': FieldValue.serverTimestamp(),
           'userName': _userData?['name'] ?? 'Unknown',
           'profilePicture': _userData?['profilePicture'],
         };
-        try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locUpdate); } catch(_) {}
+        try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locUpdate); } catch(e) { debugPrint("Stream write error: $e"); }
       },
       onError: (e) {
         print('Position stream error: $e');
@@ -1662,12 +1672,17 @@ void startLocationUpdates() async {
     ),
   ).listen(
     (Position position) async {
+      final bSpeed = position.speed.isNaN || position.speed.isInfinite ? 0.0 : position.speed;
+      final bHeading = position.heading.isNaN || position.heading.isInfinite ? 0.0 : position.heading;
+      final bLat = position.latitude.isNaN || position.latitude.isInfinite ? 0.0 : position.latitude;
+      final bLng = position.longitude.isNaN || position.longitude.isInfinite ? 0.0 : position.longitude;
+
       final locData = {
         'userId': userId,
-        'latitude': position.latitude,
-        'longitude': position.longitude,
-        'heading': position.heading,
-        'speed': position.speed,
+        'latitude': bLat,
+        'longitude': bLng,
+        'heading': bHeading,
+        'speed': bSpeed,
         'timestamp': FieldValue.serverTimestamp(),
         'userName': userName,
         'profilePicture': profilePicture,
