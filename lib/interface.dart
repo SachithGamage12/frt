@@ -468,6 +468,33 @@ class _InterfacePageState extends State<InterfacePage>
           sharingId: sharingId,
         );
       });
+      
+      // CRITICAL MINIMAL FIX: Ensure position stream restarts on resume
+      _positionStream?.cancel();
+      _positionStream = Geolocator.getPositionStream(
+        locationSettings: LocationSettings(
+          accuracy: Platform.isIOS ? LocationAccuracy.high : LocationAccuracy.bestForNavigation,
+          distanceFilter: 0,
+        ),
+      ).listen(
+        (Position position) async {
+          final locUpdate = {
+            'userId': widget.userId,
+            'latitude': position.latitude,
+            'longitude': position.longitude,
+            'heading': position.heading,
+            'speed': position.speed,
+            'timestamp': FieldValue.serverTimestamp(),
+            'userName': _userData?['name'] ?? 'Unknown',
+            'profilePicture': _userData?['profilePicture'],
+          };
+          try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locUpdate); } catch(_) {}
+        },
+        onError: (e) {
+          debugPrint('Position stream error: $e');
+        },
+      );
+
       await _startForegroundTask();
     }
   }
@@ -538,8 +565,8 @@ class _InterfacePageState extends State<InterfacePage>
     // Start position stream
     _positionStream?.cancel();
     _positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
+      locationSettings: LocationSettings(
+        accuracy: Platform.isIOS ? LocationAccuracy.high : LocationAccuracy.bestForNavigation,
         distanceFilter: 0,
       ),
     ).listen(

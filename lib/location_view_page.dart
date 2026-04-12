@@ -265,7 +265,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
     
     final lat = data['latitude'] is int ? (data['latitude'] as int).toDouble() : data['latitude'] as double?;
     final lng = data['longitude'] is int ? (data['longitude'] as int).toDouble() : data['longitude'] as double?;
-    final heading = data['heading']?.toDouble() ?? 0.0;
+    final heading = data['heading'] is int ? (data['heading'] as int).toDouble() : data['heading'] as double?;
 
     if (lat != null && lng != null && (lat != 0 || lng != 0)) {
       final newPosition = LatLng(lat, lng);
@@ -400,7 +400,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
             markers: _markers,
             polylines: _polylines,
             circles: _circles, // Added for pulsing indicator
-            myLocationEnabled: true,
+            myLocationEnabled: false,
             myLocationButtonEnabled: false,
             compassEnabled: true,
             mapToolbarEnabled: false,
