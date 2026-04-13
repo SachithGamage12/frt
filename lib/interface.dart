@@ -551,15 +551,19 @@ class _InterfacePageState extends State<InterfacePage>
 
     // Write one immediate position to Firestore
     try {
-      final pos = await Geolocator.getLastKnownPosition() 
-          ?? await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 15));
-      final lat = pos.latitude.isNaN ? 0.0 : pos.latitude;
-      final lng = pos.longitude.isNaN ? 0.0 : pos.longitude;
-      if (lat != 0.0 || lng != 0.0) {
+      // Force fresh GPS fix for the initial write to prevent stale 1km offsets
+      Position pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.best,
+        timeLimit: const Duration(seconds: 10),
+      );
+      
+      if (pos.accuracy <= 50) {
         await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set({
-          'userId': widget.userId, 'latitude': lat, 'longitude': lng,
-          'heading': pos.heading.isNaN ? 0.0 : pos.heading,
-          'speed': pos.speed.isNaN ? 0.0 : pos.speed,
+          'userId': widget.userId, 
+          'latitude': pos.latitude, 
+          'longitude': pos.longitude,
+          'heading': pos.heading,
+          'speed': pos.speed,
           'timestamp': FieldValue.serverTimestamp(),
           'userName': _userData?['name'] ?? 'Unknown',
           'profilePicture': _userData?['profilePicture'],
