@@ -1675,14 +1675,13 @@ void startLocationUpdates() async {
   // Monitor Calls in Background
   _startBackgroundCallMonitor(userId);
 
-  StreamSubscription<Position>? positionStream;
-  positionStream = Geolocator.getPositionStream(
-    locationSettings: const LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 0,
-    ),
-  ).listen(
-    (Position position) async {
+  Timer.periodic(const Duration(seconds: 5), (timer) async {
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: Platform.isIOS ? LocationAccuracy.high : LocationAccuracy.bestForNavigation,
+        timeLimit: const Duration(seconds: 4),
+      );
+
       final bSpeed = position.speed.isNaN || position.speed.isInfinite ? 0.0 : position.speed;
       final bHeading = position.heading.isNaN || position.heading.isInfinite ? 0.0 : position.heading;
       final bLat = position.latitude.isNaN || position.latitude.isInfinite ? 0.0 : position.latitude;
@@ -1699,28 +1698,19 @@ void startLocationUpdates() async {
         'profilePicture': profilePicture,
       };
 
-      // Write to Primary
-      try {
-        await FirebaseFirestore.instance
-            .collection('liveLocations')
-            .doc(sharingId)
-            .set(locData);
-      } catch (e) {
-        print('Background primary write error: $e');
-      }
-
-      // Write to Primary (Unified)
+      await FirebaseFirestore.instance
+          .collection('liveLocations')
+          .doc(sharingId)
+          .set(locData);
 
       FlutterForegroundTask.updateService(
         notificationTitle: 'FRT: Sharing Location',
         notificationText: 'Family members can see your live position.',
       );
-    },
-    onError: (e) {
-      print('Foreground position stream error: $e');
-      positionStream?.cancel();
-    },
-  );
+    } catch (e) {
+      debugPrint('Background location fetch error: $e');
+    }
+  });
 
   FlutterForegroundTask.setOnLockScreenVisibility(true);
 }
