@@ -549,7 +549,15 @@ class _InterfacePageState extends State<InterfacePage>
     );
 
     // Get initial position and save to Firestore
-    Position initialPosition = await Geolocator.getCurrentPosition();
+    Position initialPosition = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.best,
+      timeLimit: const Duration(seconds: 15),
+    ).catchError((e) async {
+       return await Geolocator.getLastKnownPosition() ?? Position(
+         longitude: 0, latitude: 0, timestamp: DateTime.now(),
+         accuracy: 0, altitude: 0, heading: 0, speed: 0, speedAccuracy: 0, altitudeAccuracy: 0, headingAccuracy: 0
+       );
+    });
     final sSpeed = initialPosition.speed.isNaN || initialPosition.speed.isInfinite ? 0.0 : initialPosition.speed;
     final sHeading = initialPosition.heading.isNaN || initialPosition.heading.isInfinite ? 0.0 : initialPosition.heading;
     final sLat = initialPosition.latitude.isNaN || initialPosition.latitude.isInfinite ? 0.0 : initialPosition.latitude;

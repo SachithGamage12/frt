@@ -114,7 +114,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
           markerId: const MarkerId('userLocation'),
           position: position,
           infoWindow: InfoWindow(title: dynamicName ?? widget.userName),
-          icon: _personIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+          icon: _personIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           rotation: heading ?? 0,
           anchor: const Offset(0.5, 0.5),
           zIndex: 2,
@@ -290,8 +290,8 @@ class _LocationViewPageState extends State<LocationViewPage> {
         );
       }
 
-      // Add to path if we moved more than 2 meters, or if it's the very first point
-      if (distance > 2 || _rawPoints.isEmpty) {
+      // Add to path if we moved more than 0.5 meters, or if it's the very first point
+      if (distance > 0.5 || _rawPoints.isEmpty) {
         setState(() {
           _rawPoints.add(newPosition);
           _pathPoints.add(newPosition);
