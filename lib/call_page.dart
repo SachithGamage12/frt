@@ -37,7 +37,10 @@ class _CallPageState extends State<CallPage> {
   void initState() {
     super.initState();
     FlutterRingtonePlayer().stop();
-    _initAgora();
+    // Delay Agora initialization to ensure CallKit audio session is ready
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _initAgora();
+    });
     _listenToCallStatus();
   }
 

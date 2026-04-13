@@ -21,6 +21,7 @@ import 'user_details_page.dart';
 import 'location_view_page.dart';
 import 'call_page.dart';
 import 'style_utils.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 
 class InterfacePage extends StatefulWidget {
   final String userId;
@@ -387,12 +388,29 @@ class _InterfacePageState extends State<InterfacePage>
         .listen((snapshot) async {
       if (snapshot.exists) {
         final data = snapshot.data();
-        if (data != null && _currentCallChannel != data['channelName']) {
+        if (data != null && data['status'] == 'ringing' && _currentCallChannel != data['channelName']) {
           _currentCallChannel = data['channelName'];
-          await _showCallkitIncoming(data);
+          
+          // Only show local UI if app is in foreground and NOT already handling via CallKit
+          if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+             Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CallPage(
+                  channelName: data['channelName'] ?? '',
+                  callerId: data['callerId'] ?? '',
+                  calleeId: widget.userId,
+                  isCaller: false,
+                ),
+              ),
+            );
+          } else {
+             await _showCallkitIncoming(data);
+          }
         }
       } else {
         _currentCallChannel = null;
+        FlutterRingtonePlayer().stop();
         await FlutterCallkitIncoming.endAllCalls();
       }
     });
@@ -1814,6 +1832,9 @@ class _InterfacePageState extends State<InterfacePage>
       ),
     );
   }
+
+
+  void _checkLocationAccuracy_REDUNDANT() {} // Placeholder for removal target
 }
 
 @pragma('vm:entry-point')
@@ -1850,42 +1871,45 @@ void startLocationUpdates() async {
   // Monitor Calls in Background
   _startBackgroundCallMonitor(userId);
 
-  Timer.periodic(const Duration(seconds: 5), (timer) async {
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-        locationSettings: AppleSettings(
-          accuracy: LocationAccuracy.best,
-          distanceFilter: 0,
-          pauseLocationUpdatesAutomatically: false,
-          showBackgroundLocationIndicator: true,
-          allowBackgroundLocationUpdates: true,
-        ),
-      );
+  try {
+    Geolocator.getPositionStream(
+      locationSettings: AppleSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 0,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+        allowBackgroundLocationUpdates: true,
+        activityType: ActivityType.fitness,
+      ),
+    ).listen((position) async {
+      try {
+        final locData = {
+          'userId': userId,
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'heading': position.heading,
+          'speed': position.speed,
+          'timestamp': FieldValue.serverTimestamp(),
+          'userName': userName,
+          'profilePicture': profilePicture,
+        };
 
-      final locData = {
-        'userId': userId,
-        'latitude': position.latitude,
-        'longitude': position.longitude,
-        'heading': position.heading,
-        'speed': position.speed,
-        'timestamp': FieldValue.serverTimestamp(),
-        'userName': userName,
-        'profilePicture': profilePicture,
-      };
+        await FirebaseFirestore.instance
+            .collection('liveLocations')
+            .doc(sharingId)
+            .set(locData);
 
-      await FirebaseFirestore.instance
-          .collection('liveLocations')
-          .doc(sharingId)
-          .set(locData);
-
-      FlutterForegroundTask.updateService(
-        notificationTitle: 'FRT: Sharing Location',
-        notificationText: 'Family members can see your live position.',
-      );
-    } catch (e) {
-      debugPrint('Background location refresh error: $e');
-    }
-  });
+        FlutterForegroundTask.updateService(
+          notificationTitle: 'FRT: Sharing Location',
+          notificationText: 'Family members can see your live position.',
+        );
+      } catch (e) {
+        debugPrint('Background location update error: $e');
+      }
+    });
+  } catch (e) {
+    debugPrint('Background stream setup error: $e');
+  }
 
   FlutterForegroundTask.setOnLockScreenVisibility(true);
 }
