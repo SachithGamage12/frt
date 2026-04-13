@@ -218,7 +218,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
 
 
     // Use a timer to show 'unavailable' if NO live updates are received
-    Future.delayed(const Duration(seconds: 10), () {
+    Future.delayed(const Duration(seconds: 20), () {
       if (mounted && _rawPoints.isEmpty) {
         // We only show unavailable if we haven't received ANY live movement updates
         // BUT we still have the initial marker from the QR code.

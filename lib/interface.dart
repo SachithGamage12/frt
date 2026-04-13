@@ -464,18 +464,10 @@ class _InterfacePageState extends State<InterfacePage>
         return;
       }
       try {
-        // ALWAYS fetch a fresh position. getLastKnownPosition is often stale/inaccurate.
         Position position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.best,
-          timeLimit: const Duration(seconds: 8),
+          timeLimit: const Duration(seconds: 12),
         );
-
-        // Accuracy Gating: Ignore positions that are too inaccurate (e.g., cell tower only)
-        // This prevents the "Wrong Location" (1km offset) issue.
-        if (position.accuracy > 50) {
-          debugPrint('Skipping low accuracy update: ${position.accuracy}m');
-          return;
-        }
 
         final lat = position.latitude;
         final lng = position.longitude;
@@ -509,10 +501,27 @@ class _InterfacePageState extends State<InterfacePage>
 
     if (userDoc.exists && userDoc.data()?['sharingId'] != null) {
       final sharingId = userDoc.data()!['sharingId'] as String;
+      
+      // Wait for a fresh position so the QR code doesn't show 0,0
+      Position? initialPos;
+      try {
+        initialPos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 10),
+        );
+      } catch(_) {
+        initialPos = await Geolocator.getLastKnownPosition();
+      }
+
       setState(() {
         _isSharingLiveLocation = true;
         _liveLocationSharingId = sharingId;
-        _locationData = _encodeLocationData(0, 0, isLive: true, sharingId: sharingId);
+        _locationData = _encodeLocationData(
+          initialPos?.latitude ?? 0,
+          initialPos?.longitude ?? 0,
+          isLive: true,
+          sharingId: sharingId,
+        );
       });
       _startLocationUpdateTimer(sharingId);
       await _startForegroundTask();
@@ -538,9 +547,26 @@ class _InterfacePageState extends State<InterfacePage>
           .set({'sharingId': sharingId, 'createdAt': FieldValue.serverTimestamp()});
     }
 
+    // Fetch high-accuracy position BEFORE generating QR code
+    Position? initialPos;
+    try {
+      initialPos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.best,
+        timeLimit: const Duration(seconds: 10),
+      );
+    } catch(_) {
+      initialPos = await Geolocator.getLastKnownPosition();
+    }
+
     setState(() {
       _isSharingLiveLocation = true;
       _liveLocationSharingId = sharingId;
+      _locationData = _encodeLocationData(
+        initialPos?.latitude ?? 0,
+        initialPos?.longitude ?? 0,
+        isLive: true,
+        sharingId: sharingId,
+      );
     });
 
     // Save foreground task data
@@ -551,19 +577,13 @@ class _InterfacePageState extends State<InterfacePage>
 
     // Write one immediate position to Firestore
     try {
-      // Force fresh GPS fix for the initial write to prevent stale 1km offsets
-      Position pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
-        timeLimit: const Duration(seconds: 10),
-      );
-      
-      if (pos.accuracy <= 50) {
+      if (initialPos != null) {
         await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set({
           'userId': widget.userId, 
-          'latitude': pos.latitude, 
-          'longitude': pos.longitude,
-          'heading': pos.heading,
-          'speed': pos.speed,
+          'latitude': initialPos.latitude, 
+          'longitude': initialPos.longitude,
+          'heading': initialPos.heading,
+          'speed': initialPos.speed,
           'timestamp': FieldValue.serverTimestamp(),
           'userName': _userData?['name'] ?? 'Unknown',
           'profilePicture': _userData?['profilePicture'],
@@ -576,7 +596,6 @@ class _InterfacePageState extends State<InterfacePage>
     await _startForegroundTask();
 
     setState(() {
-      _locationData = _encodeLocationData(0, 0, isLive: true, sharingId: sharingId);
       _showPopup = true;
     });
   }
@@ -1639,32 +1658,29 @@ void startLocationUpdates() async {
       // FORCE fresh GPS check in background to prevent stale data
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.best,
-        timeLimit: const Duration(seconds: 8),
+        timeLimit: const Duration(seconds: 10),
       );
 
-      // Only write if we have decent GPS lock (< 50m accuracy)
-      if (position.accuracy <= 50) {
-        final locData = {
-          'userId': userId,
-          'latitude': position.latitude,
-          'longitude': position.longitude,
-          'heading': position.heading,
-          'speed': position.speed,
-          'timestamp': FieldValue.serverTimestamp(),
-          'userName': userName,
-          'profilePicture': profilePicture,
-        };
+      final locData = {
+        'userId': userId,
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'heading': position.heading,
+        'speed': position.speed,
+        'timestamp': FieldValue.serverTimestamp(),
+        'userName': userName,
+        'profilePicture': profilePicture,
+      };
 
-        await FirebaseFirestore.instance
-            .collection('liveLocations')
-            .doc(sharingId)
-            .set(locData);
+      await FirebaseFirestore.instance
+          .collection('liveLocations')
+          .doc(sharingId)
+          .set(locData);
 
-        FlutterForegroundTask.updateService(
-          notificationTitle: 'FRT: Sharing Location',
-          notificationText: 'Family members can see your live position.',
-        );
-      }
+      FlutterForegroundTask.updateService(
+        notificationTitle: 'FRT: Sharing Location',
+        notificationText: 'Family members can see your live position.',
+      );
     } catch (e) {
       debugPrint('Background location refresh error: $e');
     }
