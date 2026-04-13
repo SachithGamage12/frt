@@ -1816,9 +1816,16 @@ class _InterfacePageState extends State<InterfacePage>
   }
 }
 
+@pragma('vm:entry-point')
 void startLocationUpdates() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp();
+    }
+  } catch (e) {
+    debugPrint('Background Firebase init error: $e');
+  }
 
   LocationPermission permission = await Geolocator.checkPermission();
   if (permission == LocationPermission.denied ||
@@ -1883,48 +1890,57 @@ void startLocationUpdates() async {
   FlutterForegroundTask.setOnLockScreenVisibility(true);
 }
 
+@pragma('vm:entry-point')
 void _startBackgroundCallMonitor(String userId) {
-  FirebaseFirestore.instance
-      .collection('calls')
-      .doc(userId)
-      .snapshots()
-      .listen((snapshot) async {
-    if (snapshot.exists) {
-      final data = snapshot.data();
-      if (data != null) {
-        final uuid = 'call_${DateTime.now().millisecondsSinceEpoch}';
-        final params = CallKitParams(
-          id: uuid,
-          nameCaller: data['callerName'] ?? 'Family Tracking',
-          appName: 'FRT',
-          avatar: data['profilePicture'],
-          type: 0, // Voice call
-          duration: 30000,
-          android: const AndroidParams(
-            isCustomNotification: true,
-            isShowLogo: true,
-            ringtonePath: 'system_ringtone_default',
-            backgroundColor: '#000000',
-            actionColor: '#4CAF50',
-          ),
-          ios: const IOSParams(
-            iconName: 'AppIcon',
-            handleType: 'generic',
-            supportsVideo: false,
-            audioSessionMode: 'default',
-            audioSessionActive: true,
-          ),
-          extra: {
-            'channelName': data['channelName'],
-            'callerId': data['callerId'],
-          },
-        );
-        await FlutterCallkitIncoming.showCallkitIncoming(params);
+  try {
+    FirebaseFirestore.instance
+        .collection('calls')
+        .doc(userId)
+        .snapshots()
+        .listen((snapshot) async {
+      try {
+        if (snapshot.exists) {
+          final data = snapshot.data();
+          if (data != null) {
+            final uuid = 'call_${DateTime.now().millisecondsSinceEpoch}';
+            final params = CallKitParams(
+              id: uuid,
+              nameCaller: data['callerName'] ?? 'Family Tracking',
+              appName: 'FRT',
+              avatar: data['profilePicture'],
+              type: 0,
+              duration: 30000,
+              android: const AndroidParams(
+                isCustomNotification: true,
+                isShowLogo: true,
+                ringtonePath: 'system_ringtone_default',
+                backgroundColor: '#000000',
+                actionColor: '#4CAF50',
+              ),
+              ios: const IOSParams(
+                iconName: 'AppIcon',
+                handleType: 'generic',
+                supportsVideo: false,
+                audioSessionMode: 'default',
+                audioSessionActive: true,
+              ),
+              extra: {
+                'channelName': data['channelName'],
+                'callerId': data['callerId'],
+              },
+            );
+            await FlutterCallkitIncoming.showCallkitIncoming(params);
+          }
+        } else {
+          await FlutterCallkitIncoming.endAllCalls();
+        }
+      } catch (e) {
+        debugPrint('CallKit snapshot event error: $e');
       }
-    } else {
-      await FlutterCallkitIncoming.endAllCalls();
-    }
-  });
+    });
+  } catch (e) {
+    debugPrint('Background Call Monitor listener error: $e');
+  }
 }
 
 class ScannerOverlayPainter extends CustomPainter {
