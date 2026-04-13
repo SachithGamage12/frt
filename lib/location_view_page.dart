@@ -290,33 +290,26 @@ class _LocationViewPageState extends State<LocationViewPage> {
         );
       }
 
-      // Add to path if we moved more than 0.5 meters, or if it's the very first point
+      // Always update the marker and camera to the newest point immediately
+      setState(() {
+        _lastPosition = newPosition;
+        
+        final displayName = (widget.userName == 'Unknown User' || widget.userName == 'Unknown') && data['userName'] != null
+            ? data['userName']
+            : widget.userName;
+            
+        _addMarker(newPosition, heading, displayName);
+        _isLocationAvailable = true;
+      });
+      _updateCamera(newPosition);
+
+      // Only add to the drawn path if we moved more than 0.5 meters
       if (distance > 0.5 || _rawPoints.isEmpty) {
         setState(() {
           _rawPoints.add(newPosition);
           _pathPoints.add(newPosition);
-          _lastPosition = newPosition;
-          
-          // Use dynamic name from stream if widget name was unknown
-          final displayName = (widget.userName == 'Unknown User' || widget.userName == 'Unknown') && data['userName'] != null
-              ? data['userName']
-              : widget.userName;
-              
-          _addMarker(newPosition, heading, displayName);
-          _isLocationAvailable = true;
           _updatePolyline();
         });
-
-        _updateCamera(newPosition);
-      } else {
-        // Still update marker direction and pulse even if we didn't move far enough to draw path
-        setState(() {
-          final displayName = (widget.userName == 'Unknown User' || widget.userName == 'Unknown') && data['userName'] != null
-              ? data['userName']
-              : widget.userName;
-          _addMarker(newPosition, heading, displayName);
-        });
-        _updateCamera(newPosition);
       }
     } else {
       setState(() {
