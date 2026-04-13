@@ -50,6 +50,10 @@ class _InterfacePageState extends State<InterfacePage>
   @override
   void initState() {
     super.initState();
+    _checkLocationAccuracy();
+    _startBackgroundCallMonitor(widget.userId);
+    _loadUserData();
+    _checkSubscriptionStatus();
     WidgetsBinding.instance.addObserver(this);
     _initForegroundTask();
     _fetchUserData();
@@ -61,23 +65,256 @@ class _InterfacePageState extends State<InterfacePage>
     _checkFirstTime();
   }
 
+  Future<void> _checkLocationAccuracy() async {
+    if (Platform.isIOS) {
+      try {
+        final accuracy = await Geolocator.getLocationAccuracy();
+        if (accuracy == LocationAccuracyStatus.reduced) {
+          _showPreciseLocationAlert();
+        }
+      } catch (e) {
+        debugPrint('Error checking accuracy: $e');
+      }
+    }
+  }
+
+  void _showPreciseLocationAlert() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.background,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Colors.white10)),
+        title: const Row(
+          children: [
+            Icon(Icons.location_searching, color: Colors.orangeAccent),
+            SizedBox(width: 10),
+            Text('Precise Location OFF', style: TextStyle(color: Colors.white, fontSize: 18)),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('User tracking is inaccurate. Please FIX:', style: TextStyle(color: Colors.white70)),
+            SizedBox(height: 12),
+            Text('1. Settings -> Privacy -> Location Services\n2. Select FRT App\n3. Toggle "Precise Location" to ON\n4. Set to "Always Allow"', 
+              style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+            SizedBox(height: 12),
+            Text('සිංහල: "Precise Location" ON කර "Always Allow" තෝරන්න.', style: TextStyle(color: Colors.white38, fontSize: 11)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), 
+            child: const Text('I HAVE FIXED IT', style: TextStyle(color: AppColors.primary))),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startBackgroundCallMonitor(String userId) async {
+    // Already handled by _listenForIncomingCalls but we maintain this for future isolate expansion
+    debugPrint('Call monitor active for $userId');
+  }
+
+  Future<void> _loadUserData() async {
+    final doc = await FirebaseFirestore.instance.collection('users').doc(widget.userId).get();
+    if (mounted) setState(() => _userData = doc.data());
+  }
+
+  Future<void> _checkSubscriptionStatus() async {
+    final doc = await FirebaseFirestore.instance.collection('users').doc(widget.userId).get();
+    if (doc.exists && doc.data()?['isAppUnlocked'] == false) {
+      // Re-check logic
+    }
+  }
+
+  void _showHelpCenter() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: double.maxFinite,
+          height: 520,
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: DefaultTabController(
+            length: 4,
+            child: Column(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Text('GUIDED TOUR & HELP', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                ),
+                const TabBar(
+                  isScrollable: true,
+                  indicatorColor: AppColors.primary,
+                  indicatorSize: TabBarIndicatorSize.label,
+                  tabs: [
+                    Tab(text: 'Setup'),
+                    Tab(text: 'Payment'),
+                    Tab(text: 'Profile'),
+                    Tab(text: 'iOS Setup'),
+                  ],
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _buildHelpSlide(Icons.person_add, 'Create Account', 'Enter your mobile and password. For scanning, hold the phone steady over the QR code.'),
+                      _buildHelpSlide(Icons.vpn_key, 'Activation Code', 'Enter your 10-digit code in the Subscription page to unlock full live tracking features.'),
+                      _buildHelpSlide(Icons.settings, 'Management', 'Change name/picture in Profile. To cancel, use "Unsubscribe" in the settings gear menu.'),
+                      _buildHelpSlide(Icons.phonelink_setup, 'iOS Call Fix', 'Enable "Background App Refresh" and "Always" location to receive calls while screen is OFF.'),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                      ),
+                      child: const Text('GET STARTED', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHelpSlide(IconData icon, String title, String desc) {
+    return Padding(
+      padding: const EdgeInsets.all(25),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 70, color: AppColors.primary),
+          const SizedBox(height: 25),
+          Text(title, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 15),
+          Text(desc, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white54, fontSize: 15, height: 1.5)),
+        ],
+      ),
+    );
+  }
+
   Future<void> _checkFirstTime() async {
     final prefs = await SharedPreferences.getInstance();
     bool hasSeenTour = prefs.getBool('hasSeenTour') ?? false;
     if (!hasSeenTour) {
-      setState(() {
-        _showTour = true;
-        _tourStep = 1;
-      });
+      if (mounted) {
+        setState(() {
+          _showTour = true;
+          _tourStep = 1;
+        });
+      }
     }
   }
 
   Future<void> _completeTour() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('hasSeenTour', true);
-    setState(() {
-      _showTour = false;
-    });
+    if (mounted) {
+      setState(() {
+        _showTour = false;
+        _tourStep = 0;
+      });
+    }
+  }
+
+  Widget _buildTourOverlay() {
+    if (!_showTour) return const SizedBox.shrink();
+
+    String title = "";
+    String desc = "";
+    IconData icon = Icons.info;
+
+    switch (_tourStep) {
+      case 1:
+        title = "Step 1: Account Setup";
+        desc = "Enter your mobile and password. Give all permissions (Location, Notifications, Camera) for full tracking.";
+        icon = Icons.person_add_outlined;
+        break;
+      case 2:
+        title = "Step 2: Activation";
+        desc = "After paying, use your 10-digit Code in the Subscription page to unlock real-time mapping.";
+        icon = Icons.vpn_key_outlined;
+        break;
+      case 3:
+        title = "Step 3: Track Others";
+        desc = "Scan your family's QR code or use the '+' button to start tracking their live movement.";
+        icon = Icons.qr_code_scanner_outlined;
+        break;
+      case 4:
+        title = "Step 4: Managing Profile";
+        desc = "Update your name/photo in Profile. Use the Settings Gear to 'Unsubscribe' your account safely.";
+        icon = Icons.manage_accounts_outlined;
+        break;
+      case 5:
+        title = "Final Step: iOS Call Fix";
+        desc = "IMPORTANT: For background calls, enable 'Background App Refresh' and set location to 'Always Allow'.";
+        icon = Icons.phonelink_setup;
+        break;
+    }
+
+    return Container(
+      color: Colors.black.withOpacity(0.9),
+      child: Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 30),
+          padding: const EdgeInsets.all(30),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+            boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.1), blurRadius: 20)],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 80, color: AppColors.primary),
+              const SizedBox(height: 25),
+              Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 15),
+              Text(desc, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 16)),
+              const SizedBox(height: 35),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                  ),
+                  onPressed: () {
+                    if (_tourStep < 5) {
+                      setState(() => _tourStep++);
+                    } else {
+                      _completeTour();
+                    }
+                  },
+                  child: Text(_tourStep == 5 ? "GOT IT!" : "NEXT", style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _listenForIncomingCalls() {
@@ -1192,6 +1429,14 @@ class _InterfacePageState extends State<InterfacePage>
                         top: 20,
                         right: 20,
                         child: IconButton(
+                          icon: const Icon(Icons.help_outline, color: Colors.white),
+                          onPressed: () => _showHelpCenter(),
+                        ),
+                      ),
+                      Positioned(
+                        top: 20,
+                        right: 60,
+                        child: IconButton(
                           icon: const Icon(Icons.close, color: Colors.white, size: 30),
                           onPressed: () => setState(() => _showScanner = false),
                         ),
@@ -1508,121 +1753,6 @@ class _InterfacePageState extends State<InterfacePage>
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTourOverlay() {
-    String title = "";
-    String description = "";
-    Alignment alignment = Alignment.center;
-
-    switch (_tourStep) {
-      case 1:
-        title = "Welcome to FRT!";
-        description = "Let's take a quick look at how to secure your family.";
-        alignment = Alignment.center;
-        break;
-      case 2:
-        title = "Share Your Location";
-        description = "Tap the Green button below to generate your QR code and start sharing live.";
-        alignment = Alignment.bottomRight;
-        break;
-      case 3:
-        title = "Scan Connections";
-        description = "Tap 'Scan QR Code' from the menu to add family members to your circles.";
-        alignment = Alignment.bottomCenter;
-        break;
-      case 4:
-        title = "Track Circles";
-        description = "Your added family members will appear here. Tap any card to view them on the map.";
-        alignment = Alignment.center;
-        break;
-      case 5:
-        title = "Manage Profile";
-        description = "Tap your avatar at the top right to manage your subscription and settings.";
-        alignment = Alignment.topRight;
-        break;
-    }
-
-    return GestureDetector(
-      onTap: () {
-        if (_tourStep < 5) {
-          setState(() => _tourStep++);
-        } else {
-          _completeTour();
-        }
-      },
-      child: Container(
-        color: Colors.black.withOpacity(0.85),
-        child: Stack(
-          children: [
-            Align(
-              alignment: alignment,
-              child: Padding(
-                padding: const EdgeInsets.all(40.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_tourStep > 1)
-                      const Icon(Icons.arrow_upward, color: AppColors.primary, size: 40),
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                        boxShadow: [
-                          BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 30),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            title,
-                            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            description,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.white70, fontSize: 15),
-                          ),
-                          const SizedBox(height: 24),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              TextButton(
-                                onPressed: _completeTour,
-                                child: const Text("End Tour", style: TextStyle(color: Colors.white38)),
-                              ),
-                              ElevatedButton(
-                                onPressed: () {
-                                  if (_tourStep < 5) {
-                                    setState(() => _tourStep++);
-                                  } else {
-                                    _completeTour();
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                child: Text(_tourStep == 5 ? "Finish" : "Next"),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );

@@ -569,6 +569,24 @@ class _LocationViewPageState extends State<LocationViewPage> {
           ]
         },
         {
+          "featureType": "landscape.man_made",
+          "elementType": "geometry",
+          "stylers": [
+            {
+              "color": "#e0e0e0"
+            }
+          ]
+        },
+        {
+          "featureType": "poi.business",
+          "elementType": "geometry",
+          "stylers": [
+            {
+              "color": "#e0e0e0"
+            }
+          ]
+        },
+        {
           "elementType": "labels.text.fill",
           "stylers": [
             {

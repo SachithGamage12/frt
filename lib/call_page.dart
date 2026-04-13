@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'style_utils.dart';
+import 'dart:async';
 
 class CallPage extends StatefulWidget {
   final String channelName;
@@ -29,12 +30,28 @@ class _CallPageState extends State<CallPage> {
   bool _isMuted = false;
   bool _isSpeakerOn = false;
   int? _remoteUid;
+  StreamSubscription? _callStreamSubscription;
 
   @override
   void initState() {
     super.initState();
     FlutterRingtonePlayer().stop();
     _initAgora();
+    _listenToCallStatus();
+  }
+
+  void _listenToCallStatus() {
+    final String targetId = widget.isCaller ? widget.calleeId : widget.callerId;
+    _callStreamSubscription = FirebaseFirestore.instance
+        .collection('calls')
+        .doc(targetId)
+        .snapshots()
+        .listen((snapshot) {
+      if (!snapshot.exists || (snapshot.data()?['status'] == 'ended')) {
+        // Automatically close call if document is deleted or marked as ended
+        _leaveChannel();
+      }
+    });
   }
 
   Future<void> _initAgora() async {
@@ -130,6 +147,7 @@ class _CallPageState extends State<CallPage> {
 
   @override
   void dispose() {
+    _callStreamSubscription?.cancel();
     _leaveChannel();
     super.dispose();
   }
