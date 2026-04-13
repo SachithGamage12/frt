@@ -68,6 +68,38 @@ class _InterfacePageState extends State<InterfacePage>
     _resumeLiveLocationSharing();
     _listenForIncomingCalls();
     _checkFirstTime();
+    _listenForCallKitEvents();
+  }
+
+  void _listenForCallKitEvents() {
+    FlutterCallkitIncoming.onEvent.listen((event) {
+      if (event == null) return;
+      switch (event.event) {
+        case Event.actionCallAccept:
+          final body = event.body;
+          if (body != null) {
+            final channelName = body['extra']['channelName'];
+            final callerId = body['extra']['callerId'];
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CallPage(
+                  channelName: channelName,
+                  callerId: callerId,
+                  calleeId: widget.userId,
+                  isCaller: false,
+                ),
+              ),
+            );
+          }
+          break;
+        case Event.actionCallDecline:
+          // Handle decline
+          break;
+        default:
+          break;
+      }
+    });
   }
 
   void _initCallkitListener() {
@@ -1852,7 +1884,47 @@ void startLocationUpdates() async {
 }
 
 void _startBackgroundCallMonitor(String userId) {
-  // Deprecated, use Callkit instead through interface stream.
+  FirebaseFirestore.instance
+      .collection('calls')
+      .doc(userId)
+      .snapshots()
+      .listen((snapshot) async {
+    if (snapshot.exists) {
+      final data = snapshot.data();
+      if (data != null) {
+        final uuid = 'call_${DateTime.now().millisecondsSinceEpoch}';
+        final params = CallKitParams(
+          id: uuid,
+          nameCaller: data['callerName'] ?? 'Family Tracking',
+          appName: 'FRT',
+          avatar: data['profilePicture'],
+          type: 0, // Voice call
+          duration: 30000,
+          android: const AndroidParams(
+            isCustomNotification: true,
+            isShowLogo: true,
+            ringtonePath: 'system_ringtone_default',
+            backgroundColor: '#000000',
+            actionColor: '#4CAF50',
+          ),
+          ios: const IOSParams(
+            iconName: 'AppIcon',
+            handleType: 'generic',
+            supportsVideo: false,
+            audioSessionMode: 'default',
+            audioSessionActive: true,
+          ),
+          extra: {
+            'channelName': data['channelName'],
+            'callerId': data['callerId'],
+          },
+        );
+        await FlutterCallkitIncoming.showCallkitIncoming(params);
+      }
+    } else {
+      await FlutterCallkitIncoming.endAllCalls();
+    }
+  });
 }
 
 class ScannerOverlayPainter extends CustomPainter {

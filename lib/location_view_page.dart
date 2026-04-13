@@ -399,18 +399,19 @@ class _LocationViewPageState extends State<LocationViewPage> {
             initialCameraPosition: CameraPosition(
               target: LatLng(widget.latitude, widget.longitude),
               zoom: 18,
-              tilt: 60,
+              tilt: 45,
             ),
             mapType: MapType.normal,
             markers: _markers,
             polylines: _polylines,
-            circles: _circles, // Added for pulsing indicator
+            circles: _circles,
             myLocationEnabled: false,
             myLocationButtonEnabled: false,
             compassEnabled: true,
             mapToolbarEnabled: false,
             zoomControlsEnabled: false,
             buildingsEnabled: true,
+            tiltGesturesEnabled: true,
             rotateGesturesEnabled: true,
             onMapCreated: (controller) {
               _mapController = controller;
@@ -697,6 +698,15 @@ class _LocationViewPageState extends State<LocationViewPage> {
           "stylers": [
             {
               "color": "#eeeeee"
+            }
+          ]
+        },
+        {
+          "featureType": "landscape.man_made",
+          "elementType": "geometry",
+          "stylers": [
+            {
+              "color": "#e5e5e5"
             }
           ]
         },
