@@ -37,7 +37,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
   List<LatLng> _pathPoints = [];
   List<LatLng> _rawPoints = []; // Store raw points for snapping
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _locationSubscription;
-  BitmapDescriptor? _personIcon;
+
   bool _initialPositionSet = false;
   LatLng? _lastPosition;
   bool _isLocationAvailable = true;
@@ -49,21 +49,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
   @override
   void initState() {
     super.initState();
-    _loadCustomMarker().then((_) {
-      _initializeLocation();
-    });
-  }
-
-  Future<void> _loadCustomMarker() async {
-    try {
-      _personIcon = await BitmapDescriptor.fromAssetImage(
-        const ImageConfiguration(size: Size(48, 48)),
-        'assets/car_marker.png',
-      );
-    } catch (e) {
-      print('Error loading custom marker: $e');
-      _personIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
-    }
+    _initializeLocation();
   }
 
   @override
@@ -114,7 +100,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
           markerId: const MarkerId('userLocation'),
           position: position,
           infoWindow: InfoWindow(title: dynamicName ?? widget.userName),
-          icon: _personIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
           rotation: heading ?? 0,
           anchor: const Offset(0.5, 0.5),
           zIndex: 2,
