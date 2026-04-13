@@ -36,6 +36,7 @@ class _InterfacePageState extends State<InterfacePage>
   MobileScannerController? _mobileScannerController;
   Position? _currentPosition;
   StreamSubscription<Position>? _positionStream;
+  Timer? _locationUpdateTimer;
   bool _isSharingLiveLocation = false;
   String? _liveLocationSharingId;
   List<Map<String, dynamic>> _familyMembers = [];
@@ -178,6 +179,7 @@ class _InterfacePageState extends State<InterfacePage>
     WidgetsBinding.instance.removeObserver(this);
     _mobileScannerController?.dispose();
     _positionStream?.cancel();
+    _locationUpdateTimer?.cancel();
     _stopLiveLocationSharing();
     FlutterForegroundTask.stopService();
     _callSubscription?.cancel();
@@ -187,9 +189,12 @@ class _InterfacePageState extends State<InterfacePage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused && _isSharingLiveLocation) {
-      _startForegroundTask();
+      _startForegroundTask(); // keeps app alive via notification
     } else if (state == AppLifecycleState.resumed) {
-      FlutterForegroundTask.stopService();
+      // Restart the position update timer when app comes to foreground
+      if (_isSharingLiveLocation && _liveLocationSharingId != null) {
+        _startLocationUpdateTimer(_liveLocationSharingId!);
+      }
     }
   }
 
@@ -447,6 +452,52 @@ class _InterfacePageState extends State<InterfacePage>
     }
   }
 
+  /// Starts a reliable Timer that writes location to Firestore every 5 seconds.
+  /// Uses getLastKnownPosition (instant) as primary, getCurrentPosition as fallback.
+  void _startLocationUpdateTimer(String sharingId) {
+    _locationUpdateTimer?.cancel();
+    _positionStream?.cancel();
+
+    _locationUpdateTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      if (!_isSharingLiveLocation || !mounted) {
+        timer.cancel();
+        return;
+      }
+      try {
+        // ALWAYS fetch a fresh position. getLastKnownPosition is often stale/inaccurate.
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.best,
+          timeLimit: const Duration(seconds: 8),
+        );
+
+        // Accuracy Gating: Ignore positions that are too inaccurate (e.g., cell tower only)
+        // This prevents the "Wrong Location" (1km offset) issue.
+        if (position.accuracy > 50) {
+          debugPrint('Skipping low accuracy update: ${position.accuracy}m');
+          return;
+        }
+
+        final lat = position.latitude;
+        final lng = position.longitude;
+        final heading = position.heading;
+        final speed = position.speed;
+
+        await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set({
+          'userId': widget.userId,
+          'latitude': lat,
+          'longitude': lng,
+          'heading': heading,
+          'speed': speed,
+          'timestamp': FieldValue.serverTimestamp(),
+          'userName': _userData?['name'] ?? 'Unknown',
+          'profilePicture': _userData?['profilePicture'],
+        });
+      } catch (e) {
+        debugPrint('Location update error: $e');
+      }
+    });
+  }
+
   Future<void> _resumeLiveLocationSharing() async {
     final userDoc =
         await FirebaseFirestore.instance
@@ -461,40 +512,9 @@ class _InterfacePageState extends State<InterfacePage>
       setState(() {
         _isSharingLiveLocation = true;
         _liveLocationSharingId = sharingId;
-        _locationData = _encodeLocationData(
-          0,
-          0,
-          isLive: true,
-          sharingId: sharingId,
-        );
+        _locationData = _encodeLocationData(0, 0, isLive: true, sharingId: sharingId);
       });
-      
-      // CRITICAL MINIMAL FIX: Ensure position stream restarts on resume
-      _positionStream?.cancel();
-      _positionStream = Geolocator.getPositionStream(
-        locationSettings: LocationSettings(
-          accuracy: Platform.isIOS ? LocationAccuracy.high : LocationAccuracy.bestForNavigation,
-          distanceFilter: 0,
-        ),
-      ).listen(
-        (Position position) async {
-          final locUpdate = {
-            'userId': widget.userId,
-            'latitude': position.latitude,
-            'longitude': position.longitude,
-            'heading': position.heading,
-            'speed': position.speed,
-            'timestamp': FieldValue.serverTimestamp(),
-            'userName': _userData?['name'] ?? 'Unknown',
-            'profilePicture': _userData?['profilePicture'],
-          };
-          try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locUpdate); } catch(_) {}
-        },
-        onError: (e) {
-          debugPrint('Position stream error: $e');
-        },
-      );
-
+      _startLocationUpdateTimer(sharingId);
       await _startForegroundTask();
     }
   }
@@ -504,31 +524,18 @@ class _InterfacePageState extends State<InterfacePage>
 
     String? sharingId;
 
-    // Check if there's an existing sharingId in Firestore
-    final userDoc =
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.userId)
-            .collection('liveSharing')
-            .doc('current')
-            .get();
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users').doc(widget.userId)
+        .collection('liveSharing').doc('current').get();
 
     if (userDoc.exists && userDoc.data()?['sharingId'] != null) {
       sharingId = userDoc.data()!['sharingId'] as String;
     } else {
-      // Generate a new sharingId if none exists
-      sharingId =
-          FirebaseFirestore.instance.collection('liveLocations').doc().id;
-      // Save the new sharingId to Firestore
+      sharingId = FirebaseFirestore.instance.collection('liveLocations').doc().id;
       await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .collection('liveSharing')
-          .doc('current')
-          .set({
-            'sharingId': sharingId,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+          .collection('users').doc(widget.userId)
+          .collection('liveSharing').doc('current')
+          .set({'sharingId': sharingId, 'createdAt': FieldValue.serverTimestamp()});
     }
 
     setState(() {
@@ -536,88 +543,36 @@ class _InterfacePageState extends State<InterfacePage>
       _liveLocationSharingId = sharingId;
     });
 
-    // Save data for foreground task
+    // Save foreground task data
     await FlutterForegroundTask.saveData(key: 'sharingId', value: sharingId);
     await FlutterForegroundTask.saveData(key: 'userId', value: widget.userId);
-    await FlutterForegroundTask.saveData(
-      key: 'userName',
-      value: _userData?['name'] ?? 'Unknown',
-    );
-    await FlutterForegroundTask.saveData(
-      key: 'profilePicture',
-      value: _userData?['profilePicture'] ?? '',
-    );
+    await FlutterForegroundTask.saveData(key: 'userName', value: _userData?['name'] ?? 'Unknown');
+    await FlutterForegroundTask.saveData(key: 'profilePicture', value: _userData?['profilePicture'] ?? '');
 
-    Position initialPosition;
+    // Write one immediate position to Firestore
     try {
-      initialPosition = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
-        timeLimit: const Duration(seconds: 15),
-      );
-    } catch (e) {
-      debugPrint("Timeout getting initial position: $e");
-      initialPosition = await Geolocator.getLastKnownPosition() ?? Position(
-        longitude: 0, latitude: 0, timestamp: DateTime.now(),
-        accuracy: 0, altitude: 0, heading: 0, speed: 0, speedAccuracy: 0, altitudeAccuracy: 0, headingAccuracy: 0
-      );
-    }
-    final sSpeed = initialPosition.speed.isNaN || initialPosition.speed.isInfinite ? 0.0 : initialPosition.speed;
-    final sHeading = initialPosition.heading.isNaN || initialPosition.heading.isInfinite ? 0.0 : initialPosition.heading;
-    final sLat = initialPosition.latitude.isNaN || initialPosition.latitude.isInfinite ? 0.0 : initialPosition.latitude;
-    final sLng = initialPosition.longitude.isNaN || initialPosition.longitude.isInfinite ? 0.0 : initialPosition.longitude;
-
-    final locData = {
-      'userId': widget.userId,
-      'latitude': sLat,
-      'longitude': sLng,
-      'heading': sHeading,
-      'speed': sSpeed,
-      'timestamp': FieldValue.serverTimestamp(),
-      'userName': _userData?['name'] ?? 'Unknown',
-      'profilePicture': _userData?['profilePicture'],
-    };
-        try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locData); } catch(e) { debugPrint("Init write error: $e"); }
-
-    // Start position stream
-    _positionStream?.cancel();
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: LocationSettings(
-        accuracy: Platform.isIOS ? LocationAccuracy.high : LocationAccuracy.bestForNavigation,
-        distanceFilter: 0,
-      ),
-    ).listen(
-      (Position position) async {
-        final speed = position.speed.isNaN || position.speed.isInfinite ? 0.0 : position.speed;
-        final heading = position.heading.isNaN || position.heading.isInfinite ? 0.0 : position.heading;
-        final lat = position.latitude.isNaN || position.latitude.isInfinite ? 0.0 : position.latitude;
-        final lng = position.longitude.isNaN || position.longitude.isInfinite ? 0.0 : position.longitude;
-
-        final locUpdate = {
-          'userId': widget.userId,
-          'latitude': lat,
-          'longitude': lng,
-          'heading': heading,
-          'speed': speed,
+      final pos = await Geolocator.getLastKnownPosition() 
+          ?? await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high, timeLimit: const Duration(seconds: 15));
+      final lat = pos.latitude.isNaN ? 0.0 : pos.latitude;
+      final lng = pos.longitude.isNaN ? 0.0 : pos.longitude;
+      if (lat != 0.0 || lng != 0.0) {
+        await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set({
+          'userId': widget.userId, 'latitude': lat, 'longitude': lng,
+          'heading': pos.heading.isNaN ? 0.0 : pos.heading,
+          'speed': pos.speed.isNaN ? 0.0 : pos.speed,
           'timestamp': FieldValue.serverTimestamp(),
           'userName': _userData?['name'] ?? 'Unknown',
           'profilePicture': _userData?['profilePicture'],
-        };
-        try { await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set(locUpdate); } catch(e) { debugPrint("Stream write error: $e"); }
-      },
-      onError: (e) {
-        print('Position stream error: $e');
-      },
-    );
+        });
+      }
+    } catch (e) { debugPrint('Initial write error: $e'); }
 
+    // Start the reliable Timer to keep updating Firestore every 5 seconds
+    _startLocationUpdateTimer(sharingId!);
     await _startForegroundTask();
 
     setState(() {
-      _locationData = _encodeLocationData(
-        0,
-        0,
-        isLive: true,
-        sharingId: sharingId,
-      );
+      _locationData = _encodeLocationData(0, 0, isLive: true, sharingId: sharingId);
       _showPopup = true;
     });
   }
@@ -1677,38 +1632,37 @@ void startLocationUpdates() async {
 
   Timer.periodic(const Duration(seconds: 5), (timer) async {
     try {
+      // FORCE fresh GPS check in background to prevent stale data
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: Platform.isIOS ? LocationAccuracy.high : LocationAccuracy.bestForNavigation,
-        timeLimit: const Duration(seconds: 4),
+        desiredAccuracy: LocationAccuracy.best,
+        timeLimit: const Duration(seconds: 8),
       );
 
-      final bSpeed = position.speed.isNaN || position.speed.isInfinite ? 0.0 : position.speed;
-      final bHeading = position.heading.isNaN || position.heading.isInfinite ? 0.0 : position.heading;
-      final bLat = position.latitude.isNaN || position.latitude.isInfinite ? 0.0 : position.latitude;
-      final bLng = position.longitude.isNaN || position.longitude.isInfinite ? 0.0 : position.longitude;
+      // Only write if we have decent GPS lock (< 50m accuracy)
+      if (position.accuracy <= 50) {
+        final locData = {
+          'userId': userId,
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'heading': position.heading,
+          'speed': position.speed,
+          'timestamp': FieldValue.serverTimestamp(),
+          'userName': userName,
+          'profilePicture': profilePicture,
+        };
 
-      final locData = {
-        'userId': userId,
-        'latitude': bLat,
-        'longitude': bLng,
-        'heading': bHeading,
-        'speed': bSpeed,
-        'timestamp': FieldValue.serverTimestamp(),
-        'userName': userName,
-        'profilePicture': profilePicture,
-      };
+        await FirebaseFirestore.instance
+            .collection('liveLocations')
+            .doc(sharingId)
+            .set(locData);
 
-      await FirebaseFirestore.instance
-          .collection('liveLocations')
-          .doc(sharingId)
-          .set(locData);
-
-      FlutterForegroundTask.updateService(
-        notificationTitle: 'FRT: Sharing Location',
-        notificationText: 'Family members can see your live position.',
-      );
+        FlutterForegroundTask.updateService(
+          notificationTitle: 'FRT: Sharing Location',
+          notificationText: 'Family members can see your live position.',
+        );
+      }
     } catch (e) {
-      debugPrint('Background location fetch error: $e');
+      debugPrint('Background location refresh error: $e');
     }
   });
 
