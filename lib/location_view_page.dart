@@ -569,20 +569,10 @@ class _LocationViewPageState extends State<LocationViewPage> {
           ]
         },
         {
-          "featureType": "landscape.man_made",
-          "elementType": "geometry",
+          "elementType": "labels.icon",
           "stylers": [
             {
-              "color": "#e0e0e0"
-            }
-          ]
-        },
-        {
-          "featureType": "poi.business",
-          "elementType": "geometry",
-          "stylers": [
-            {
-              "color": "#e0e0e0"
+              "visibility": "off"
             }
           ]
         },
@@ -603,38 +593,11 @@ class _LocationViewPageState extends State<LocationViewPage> {
           ]
         },
         {
-          "featureType": "administrative",
-          "elementType": "geometry.stroke",
-          "stylers": [
-            {
-              "color": "#c9b2a6"
-            }
-          ]
-        },
-        {
-          "featureType": "administrative.land_parcel",
-          "elementType": "geometry.stroke",
-          "stylers": [
-            {
-              "color": "#dcd2be"
-            }
-          ]
-        },
-        {
           "featureType": "administrative.land_parcel",
           "elementType": "labels.text.fill",
           "stylers": [
             {
-              "color": "#ae9e90"
-            }
-          ]
-        },
-        {
-          "featureType": "landscape.natural",
-          "elementType": "geometry",
-          "stylers": [
-            {
-              "color": "#dfe7e2"
+              "color": "#bdbdbd"
             }
           ]
         },
@@ -643,7 +606,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
           "elementType": "geometry",
           "stylers": [
             {
-              "color": "#dfe7e2"
+              "color": "#eeeeee"
             }
           ]
         },
@@ -652,16 +615,16 @@ class _LocationViewPageState extends State<LocationViewPage> {
           "elementType": "labels.text.fill",
           "stylers": [
             {
-              "color": "#93817c"
+              "color": "#757575"
             }
           ]
         },
         {
           "featureType": "poi.park",
-          "elementType": "geometry.fill",
+          "elementType": "geometry",
           "stylers": [
             {
-              "color": "#a5b076"
+              "color": "#e5e5e5"
             }
           ]
         },
@@ -670,7 +633,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
           "elementType": "labels.text.fill",
           "stylers": [
             {
-              "color": "#447530"
+              "color": "#9e9e9e"
             }
           ]
         },
@@ -685,10 +648,10 @@ class _LocationViewPageState extends State<LocationViewPage> {
         },
         {
           "featureType": "road.arterial",
-          "elementType": "geometry",
+          "elementType": "labels.text.fill",
           "stylers": [
             {
-              "color": "#fdfcf8"
+              "color": "#757575"
             }
           ]
         },
@@ -697,34 +660,16 @@ class _LocationViewPageState extends State<LocationViewPage> {
           "elementType": "geometry",
           "stylers": [
             {
-              "color": "#f8c967"
+              "color": "#dadada"
             }
           ]
         },
         {
           "featureType": "road.highway",
-          "elementType": "geometry.stroke",
+          "elementType": "labels.text.fill",
           "stylers": [
             {
-              "color": "#e9bc62"
-            }
-          ]
-        },
-        {
-          "featureType": "road.highway.controlled_access",
-          "elementType": "geometry",
-          "stylers": [
-            {
-              "color": "#e98d58"
-            }
-          ]
-        },
-        {
-          "featureType": "road.highway.controlled_access",
-          "elementType": "geometry.stroke",
-          "stylers": [
-            {
-              "color": "#db8555"
+              "color": "#616161"
             }
           ]
         },
@@ -733,7 +678,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
           "elementType": "labels.text.fill",
           "stylers": [
             {
-              "color": "#806b63"
+              "color": "#9e9e9e"
             }
           ]
         },
@@ -742,25 +687,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
           "elementType": "geometry",
           "stylers": [
             {
-              "color": "#dfd2ae"
-            }
-          ]
-        },
-        {
-          "featureType": "transit.line",
-          "elementType": "labels.text.fill",
-          "stylers": [
-            {
-              "color": "#8f7d77"
-            }
-          ]
-        },
-        {
-          "featureType": "transit.line",
-          "elementType": "labels.text.stroke",
-          "stylers": [
-            {
-              "color": "#ebe3cd"
+              "color": "#e5e5e5"
             }
           ]
         },
@@ -769,16 +696,16 @@ class _LocationViewPageState extends State<LocationViewPage> {
           "elementType": "geometry",
           "stylers": [
             {
-              "color": "#dfd2ae"
+              "color": "#eeeeee"
             }
           ]
         },
         {
           "featureType": "water",
-          "elementType": "geometry.fill",
+          "elementType": "geometry",
           "stylers": [
             {
-              "color": "#b9d3c2"
+              "color": "#c9c9c9"
             }
           ]
         },
@@ -787,7 +714,7 @@ class _LocationViewPageState extends State<LocationViewPage> {
           "elementType": "labels.text.fill",
           "stylers": [
             {
-              "color": "#92998d"
+              "color": "#9e9e9e"
             }
           ]
         }

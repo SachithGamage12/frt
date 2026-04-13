@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'style_utils.dart';
 import 'dart:async';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 
 class CallPage extends StatefulWidget {
   final String channelName;
@@ -118,13 +119,13 @@ class _CallPageState extends State<CallPage> {
       debugPrint("Error leaving channel: $e");
     }
     
-    // Clear ringing state from Firestore from BOTH primary and secondary apps
-    final String targetId = widget.isCaller ? widget.calleeId : widget.callerId;
-    
-    // Primary (Unified)
-    try { 
-      await FirebaseFirestore.instance.collection('calls').doc(targetId).delete(); 
+    // Clear ringing state from Firestore
+    // Always clear the callee's document ID as that is the primary signaling point
+    try {
+      await FirebaseFirestore.instance.collection('calls').doc(widget.calleeId).delete();
     } catch(_) {}
+    
+    await FlutterCallkitIncoming.endAllCalls();
     
     if (mounted) {
       Navigator.pop(context);

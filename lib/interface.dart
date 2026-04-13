@@ -6,10 +6,15 @@ import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+
+import 'package:firebase_core/firebase_core.dart';
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/call_event.dart';
+import 'package:flutter_callkit_incoming/entities/call_kit_params.dart';
+import 'package:flutter_callkit_incoming/entities/android_params.dart';
+import 'package:flutter_callkit_incoming/entities/ios_params.dart';
 
 // Internal Project Imports
 import 'user_details_page.dart';
@@ -41,7 +46,7 @@ class _InterfacePageState extends State<InterfacePage>
   String? _liveLocationSharingId;
   List<Map<String, dynamic>> _familyMembers = [];
   StreamSubscription<DocumentSnapshot>? _callSubscription;
-  bool _isCallDialogShowing = false;
+  String? _currentCallChannel;
 
   bool _isHandlingQr = false;
   int _tourStep = 0;
@@ -51,7 +56,7 @@ class _InterfacePageState extends State<InterfacePage>
   void initState() {
     super.initState();
     _checkLocationAccuracy();
-    _startBackgroundCallMonitor(widget.userId);
+    _initCallkitListener();
     _loadUserData();
     _checkSubscriptionStatus();
     WidgetsBinding.instance.addObserver(this);
@@ -63,6 +68,36 @@ class _InterfacePageState extends State<InterfacePage>
     _resumeLiveLocationSharing();
     _listenForIncomingCalls();
     _checkFirstTime();
+  }
+
+  void _initCallkitListener() {
+    FlutterCallkitIncoming.onEvent.listen((CallEvent? event) async {
+      switch (event?.event) {
+        case Event.actionCallAccept:
+          try { await FirebaseFirestore.instance.collection('calls').doc(widget.userId).delete(); } catch(_) {}
+          final channelName = event?.body['extra']['channelName'];
+          final callerId = event?.body['extra']['callerId'];
+          if (mounted && channelName != null && callerId != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CallPage(
+                  channelName: channelName,
+                  callerId: callerId,
+                  calleeId: widget.userId,
+                  isCaller: false,
+                ),
+              ),
+            );
+          }
+          break;
+        case Event.actionCallDecline:
+          try { await FirebaseFirestore.instance.collection('calls').doc(widget.userId).delete(); } catch(_) {}
+          break;
+        default:
+          break;
+      }
+    });
   }
 
   Future<void> _checkLocationAccuracy() async {
@@ -110,11 +145,6 @@ class _InterfacePageState extends State<InterfacePage>
         ],
       ),
     );
-  }
-
-  Future<void> _startBackgroundCallMonitor(String userId) async {
-    // Already handled by _listenForIncomingCalls but we maintain this for future isolate expansion
-    debugPrint('Call monitor active for $userId');
   }
 
   Future<void> _loadUserData() async {
@@ -322,65 +352,60 @@ class _InterfacePageState extends State<InterfacePage>
         .collection('calls')
         .doc(widget.userId)
         .snapshots()
-        .listen((snapshot) {
+        .listen((snapshot) async {
       if (snapshot.exists) {
         final data = snapshot.data();
-        if (data != null && !_isCallDialogShowing) {
-          _isCallDialogShowing = true;
-          _showIncomingCallDialog(data);
+        if (data != null && _currentCallChannel != data['channelName']) {
+          _currentCallChannel = data['channelName'];
+          await _showCallkitIncoming(data);
         }
       } else {
-        // Call document deleted (Hangup)
-        if (_isCallDialogShowing && mounted) {
-          Navigator.of(context, rootNavigator: true).pop(); // Dismiss dialog
-          _isCallDialogShowing = false;
-        }
-        FlutterRingtonePlayer().stop();
+        _currentCallChannel = null;
+        await FlutterCallkitIncoming.endAllCalls();
       }
     });
   }
 
-  void _showIncomingCallDialog(Map<String, dynamic> callData) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text('Incoming Call from ${callData['callerName'] ?? 'Unknown'}'),
-        content: const Text('Do you want to accept this call?'),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              // Decline
-              try { await FirebaseFirestore.instance.collection('calls').doc(widget.userId).delete(); } catch(_) {}
-              if (mounted) {
-                Navigator.pop(context);
-              }
-              _isCallDialogShowing = false;
-            },
-            child: const Text('Decline', style: TextStyle(color: Colors.red)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _isCallDialogShowing = false;
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CallPage(
-                    channelName: callData['channelName'],
-                    callerId: callData['callerId'],
-                    calleeId: widget.userId,
-                    isCaller: false,
-                  ),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Accept', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+  Future<void> _showCallkitIncoming(Map<String, dynamic> callData) async {
+    final params = CallKitParams(
+      id: callData['channelName'] ?? widget.userId,
+      nameCaller: callData['callerName'] ?? 'Family Member',
+      appName: 'Family Road Track',
+      handle: 'Incoming Voice Call',
+      type: 0,
+      textAccept: 'Accept',
+      textDecline: 'Decline',
+      duration: 30000,
+      extra: <String, dynamic>{
+        'channelName': callData['channelName'],
+        'callerId': callData['callerId'],
+      },
+      headers: <String, dynamic>{'apiKey': 'xxxx', 'appId': 'xxxx'},
+      android: const AndroidParams(
+        isCustomNotification: true,
+        isShowLogo: false,
+        ringtonePath: 'system_ringtone_default',
+        backgroundColor: '#0955fa',
+        actionColor: '#4CAF50',
+      ),
+      ios: const IOSParams(
+        iconName: 'AppIcon',
+        handleType: '',
+        supportsVideo: false,
+        maximumCallGroups: 1,
+        maximumCallsPerCallGroup: 1,
+        audioSessionMode: 'default',
+        audioSessionActive: true,
+        audioSessionPreferredSampleRate: 44100.0,
+        audioSessionPreferredIOBufferDuration: 0.005,
+        supportsDTMF: true,
+        supportsHolding: true,
+        supportsGrouping: false,
+        supportsUngrouping: false,
+        ringtonePath: 'system_ringtone_default',
       ),
     );
+    await FlutterCallkitIncoming.showCallkitIncoming(params);
   }
 
   void _initiateCall(String targetUserId, String targetUserName) async {
@@ -456,7 +481,7 @@ class _InterfacePageState extends State<InterfacePage>
       ),
       foregroundTaskOptions: const ForegroundTaskOptions(
         interval: 5000,
-        autoRunOnBoot: false,
+        autoRunOnBoot: true,
         allowWifiLock: true,
       ),
     );
@@ -1760,6 +1785,9 @@ class _InterfacePageState extends State<InterfacePage>
 }
 
 void startLocationUpdates() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+
   LocationPermission permission = await Geolocator.checkPermission();
   if (permission == LocationPermission.denied ||
       permission == LocationPermission.deniedForever) {
@@ -1785,10 +1813,14 @@ void startLocationUpdates() async {
 
   Timer.periodic(const Duration(seconds: 5), (timer) async {
     try {
-      // FORCE fresh GPS check in background to prevent stale data
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
-        timeLimit: const Duration(seconds: 10),
+        locationSettings: AppleSettings(
+          accuracy: LocationAccuracy.best,
+          distanceFilter: 0,
+          pauseLocationUpdatesAutomatically: false,
+          showBackgroundLocationIndicator: true,
+          allowBackgroundLocationUpdates: true,
+        ),
       );
 
       final locData = {
@@ -1820,42 +1852,7 @@ void startLocationUpdates() async {
 }
 
 void _startBackgroundCallMonitor(String userId) {
-  // Local Notifications Initialization
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/launcher_icon');
-  const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-  flutterLocalNotificationsPlugin.initialize(initializationSettings);
-
-  FirebaseFirestore.instance
-      .collection('calls')
-      .where('receiverId', isEqualTo: userId)
-      .snapshots()
-      .listen((snapshot) {
-    for (var change in snapshot.docChanges) {
-      if (change.type == DocumentChangeType.added) {
-        final data = change.doc.data();
-        if (data != null && data['status'] == 'ringing') {
-          // Play Ringtone
-          FlutterRingtonePlayer().playRingtone();
-          
-          // Show Local Notification
-          const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
-            'call_channel', 'Incoming Calls',
-            importance: Importance.max,
-            priority: Priority.high,
-            fullScreenIntent: true,
-          );
-          const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
-          flutterLocalNotificationsPlugin.show(
-            0, 'Incoming Call', 'Someone is calling you in FRT...',
-            platformChannelSpecifics,
-          );
-        }
-      } else if (change.type == DocumentChangeType.modified || change.type == DocumentChangeType.removed) {
-        FlutterRingtonePlayer().stop();
-      }
-    }
-  });
+  // Deprecated, use Callkit instead through interface stream.
 }
 
 class ScannerOverlayPainter extends CustomPainter {
