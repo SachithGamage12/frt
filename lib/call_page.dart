@@ -70,10 +70,9 @@ class _CallPageState extends State<CallPage> {
       channelProfile: ChannelProfileType.channelProfileCommunication,
     ));
 
-    // Optimize audio for low-latency voice
     await _engine.setAudioProfile(
       profile: AudioProfileType.audioProfileSpeechStandard,
-      scenario: AudioScenarioType.audioScenarioChatroom,
+      scenario: AudioScenarioType.audioScenarioDefault,
     );
     
     _isEngineInitialized = true;

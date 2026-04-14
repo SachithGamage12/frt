@@ -58,11 +58,13 @@ class _InterfacePageState extends State<InterfacePage>
   void initState() {
     super.initState();
     _checkLocationAccuracy();
-    _initCallkitListener();
+    // _initCallkitListener removed - combined with _listenForCallKitEvents
     _loadUserData();
     _checkSubscriptionStatus();
     WidgetsBinding.instance.addObserver(this);
-    _initForegroundTask();
+    if (Platform.isAndroid) {
+      _initForegroundTask();
+    }
     _fetchUserData();
     _checkLocationPermission();
     _loadFamilyMembers();
@@ -106,35 +108,6 @@ class _InterfacePageState extends State<InterfacePage>
     });
   }
 
-  void _initCallkitListener() {
-    FlutterCallkitIncoming.onEvent.listen((CallEvent? event) async {
-      switch (event?.event) {
-        case Event.actionCallAccept:
-          try { await FirebaseFirestore.instance.collection('calls').doc(widget.userId).delete(); } catch(_) {}
-          final channelName = event?.body['extra']['channelName'];
-          final callerId = event?.body['extra']['callerId'];
-          if (mounted && channelName != null && callerId != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CallPage(
-                  channelName: channelName,
-                  callerId: callerId,
-                  calleeId: widget.userId,
-                  isCaller: false,
-                ),
-              ),
-            );
-          }
-          break;
-        case Event.actionCallDecline:
-          try { await FirebaseFirestore.instance.collection('calls').doc(widget.userId).delete(); } catch(_) {}
-          break;
-        default:
-          break;
-      }
-    });
-  }
 
   Future<void> _checkLocationAccuracy() async {
     if (Platform.isIOS) {
