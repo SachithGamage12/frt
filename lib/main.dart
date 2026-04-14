@@ -14,6 +14,7 @@ import 'style_utils.dart';
 import 'globals.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
+import 'call_page.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -69,6 +70,20 @@ void main() async {
              InitialCallState.targetCallerName = extra['callerName'];
              InitialCallState.hasPendingCall = true;
              debugPrint("Bufferized Pending Call: ${extra['channelName']}");
+             
+             // INSTANT-PUSH: If app is already active, jump to call immediately
+             if (navigatorKey.currentState != null) {
+                navigatorKey.currentState?.push(
+                  MaterialPageRoute(
+                    builder: (context) => CallPage(
+                      channelName: extra['channelName'],
+                      callerId: extra['callerId'] ?? 'unknown',
+                      calleeId: 'current_user', 
+                      isCaller: false,
+                    ),
+                  ),
+                );
+             }
           }
        }
     });

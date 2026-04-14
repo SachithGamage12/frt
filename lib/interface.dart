@@ -415,22 +415,10 @@ class _InterfacePageState extends State<InterfacePage>
               _isCallOpening = true;
               _currentCallChannel = data['channelName'];
               
-              // Only navigate if app is in a stable state
-              if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-                 navigatorKey.currentState?.push(
-                  MaterialPageRoute(
-                    builder: (context) => CallPage(
-                      channelName: data['channelName'] ?? '',
-                      callerId: data['callerId'] ?? '',
-                      calleeId: widget.userId,
-                      isCaller: false,
-                    ),
-                  ),
-                ).then((_) => _isCallOpening = false);
-              } else {
-                 await _showCallkitIncoming(data);
-                 _isCallOpening = false;
-              }
+              // ALWAYS show CallKit to ensure user sees the Answer/Decline button.
+              // We no longer navigate automatically. 
+              await _showCallkitIncoming(data);
+              _isCallOpening = false;
             }
           } else {
             _currentCallChannel = null;
@@ -454,8 +442,8 @@ class _InterfacePageState extends State<InterfacePage>
       handle: 'Incoming Voice Call',
       avatar: callData['callerAvatar'],
       type: 0,
-      textAccept: 'Accept',
-      textDecline: 'Decline',
+      textAccept: 'ANSWER',
+      textDecline: 'DECLINE',
       duration: 30000,
       extra: <String, dynamic>{
         'channelName': callData['channelName'],
@@ -463,7 +451,7 @@ class _InterfacePageState extends State<InterfacePage>
         'callerName': callData['callerName'],
       },
       android: const AndroidParams(
-        isCustomNotification: true,
+        isCustomNotification: false, // Standard UI is more reliable for locked screens
         isShowLogo: true,
         ringtonePath: 'system_ringtone_default',
         backgroundColor: '#0955fa',
