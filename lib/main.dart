@@ -14,8 +14,6 @@ import 'style_utils.dart';
 import 'globals.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
-import 'package:agora_rtc_engine/agora_rtc_engine.dart';
-import 'call_page.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -23,13 +21,17 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   
   // Detect if this is a calling signal
   final data = message.data;
+  debugPrint("Received Background Message: $data");
+  
   if (data['type'] == 'call' || data['channelName'] != null) {
       final params = CallKitParams(
         id: data['channelName'] ?? 'incoming_call',
         nameCaller: data['callerName'] ?? 'Family Tracking',
         appName: 'FRT',
+        avatar: data['callerAvatar'],
         type: 0,
         duration: 30000,
+        extra: data,
         android: const AndroidParams(
           isCustomNotification: true,
           isShowLogo: true,
@@ -42,7 +44,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           audioSessionMode: 'default',
           audioSessionActive: true,
         ),
-        extra: data,
       );
       await FlutterCallkitIncoming.showCallkitIncoming(params);
   }
@@ -58,6 +59,8 @@ void main() async {
     // Listen for Cold-Start CallKit actions (App opened by Answer)
     FlutterCallkitIncoming.onEvent.listen((event) {
        if (event == null) return;
+       debugPrint("CallKit Global Event: ${event.event}");
+       
        if (event.event == 'ACTION_CALL_ACCEPT') {
           final extra = event.body['extra'];
           if (extra != null && extra['channelName'] != null) {
@@ -65,6 +68,7 @@ void main() async {
              InitialCallState.targetCallerId = extra['callerId'];
              InitialCallState.targetCallerName = extra['callerName'];
              InitialCallState.hasPendingCall = true;
+             debugPrint("Bufferized Pending Call: ${extra['channelName']}");
           }
        }
     });

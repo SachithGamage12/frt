@@ -450,8 +450,9 @@ class _InterfacePageState extends State<InterfacePage>
     final params = CallKitParams(
       id: callData['channelName'] ?? widget.userId,
       nameCaller: callData['callerName'] ?? 'Family Member',
-      appName: 'Family Road Track',
+      appName: 'FRT',
       handle: 'Incoming Voice Call',
+      avatar: callData['callerAvatar'],
       type: 0,
       textAccept: 'Accept',
       textDecline: 'Decline',
@@ -459,30 +460,21 @@ class _InterfacePageState extends State<InterfacePage>
       extra: <String, dynamic>{
         'channelName': callData['channelName'],
         'callerId': callData['callerId'],
+        'callerName': callData['callerName'],
       },
-      headers: <String, dynamic>{'apiKey': 'xxxx', 'appId': 'xxxx'},
       android: const AndroidParams(
         isCustomNotification: true,
-        isShowLogo: false,
+        isShowLogo: true,
         ringtonePath: 'system_ringtone_default',
         backgroundColor: '#0955fa',
         actionColor: '#4CAF50',
       ),
       ios: const IOSParams(
         iconName: 'AppIcon',
-        handleType: '',
+        handleType: 'generic',
         supportsVideo: false,
-        maximumCallGroups: 1,
-        maximumCallsPerCallGroup: 1,
         audioSessionMode: 'default',
         audioSessionActive: true,
-        audioSessionPreferredSampleRate: 44100.0,
-        audioSessionPreferredIOBufferDuration: 0.005,
-        supportsDTMF: true,
-        supportsHolding: true,
-        supportsGrouping: false,
-        supportsUngrouping: false,
-        ringtonePath: 'system_ringtone_default',
       ),
     );
     await FlutterCallkitIncoming.showCallkitIncoming(params);
@@ -491,11 +483,14 @@ class _InterfacePageState extends State<InterfacePage>
   void _initiateCall(String targetUserId, String targetUserName) async {
     final channelName = 'room_${widget.userId}_$targetUserId';
     
-    // Create ringing doc for target
+    // Industrial Payload: Includes status and type for FCM triggering
     final callData = {
       'callerId': widget.userId,
       'callerName': _userData?['name'] ?? 'Family Member',
+      'callerAvatar': _userData?['profilePicture'],
       'channelName': channelName,
+      'status': 'ringing',
+      'type': 'call',
       'timestamp': FieldValue.serverTimestamp(),
     };
 
