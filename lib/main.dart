@@ -12,10 +12,16 @@ import 'payment_page.dart';
 import 'admin_panel.dart';
 import 'style_utils.dart';
 
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     _initializeFCM(); // Non-blocking
   } catch (e) {
     print("Firebase initialization error: $e");
