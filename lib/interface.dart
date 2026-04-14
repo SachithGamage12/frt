@@ -48,6 +48,7 @@ class _InterfacePageState extends State<InterfacePage>
   List<Map<String, dynamic>> _familyMembers = [];
   StreamSubscription<DocumentSnapshot>? _callSubscription;
   String? _currentCallChannel;
+  bool _isCallOpening = false;
 
   bool _isHandlingQr = false;
   int _tourStep = 0;
@@ -81,6 +82,8 @@ class _InterfacePageState extends State<InterfacePage>
           if (body != null) {
             final channelName = body['extra']['channelName'];
             final callerId = body['extra']['callerId'];
+            if (_isCallOpening) return;
+            _isCallOpening = true;
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -91,7 +94,7 @@ class _InterfacePageState extends State<InterfacePage>
                   isCaller: false,
                 ),
               ),
-            );
+            ).then((_) => _isCallOpening = false);
           }
           break;
         case Event.actionCallDecline:
@@ -381,38 +384,51 @@ class _InterfacePageState extends State<InterfacePage>
   }
 
   void _listenForIncomingCalls() {
-    _callSubscription = FirebaseFirestore.instance
-        .collection('calls')
-        .doc(widget.userId)
-        .snapshots()
-        .listen((snapshot) async {
-      if (snapshot.exists) {
-        final data = snapshot.data();
-        if (data != null && data['status'] == 'ringing' && _currentCallChannel != data['channelName']) {
-          _currentCallChannel = data['channelName'];
-          
-          // Only show local UI if app is in foreground and NOT already handling via CallKit
-          if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-             Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CallPage(
-                  channelName: data['channelName'] ?? '',
-                  callerId: data['callerId'] ?? '',
-                  calleeId: widget.userId,
-                  isCaller: false,
-                ),
-              ),
-            );
+    // Delay listener slightly to ensure Firebase and UI are stable
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      _callSubscription = FirebaseFirestore.instance
+          .collection('calls')
+          .doc(widget.userId)
+          .snapshots()
+          .listen((snapshot) async {
+        try {
+          if (snapshot.exists) {
+            final data = snapshot.data();
+            if (data != null && data['status'] == 'ringing' && _currentCallChannel != data['channelName']) {
+              if (_isCallOpening) return;
+              _isCallOpening = true;
+              _currentCallChannel = data['channelName'];
+              
+              // Only show local UI if app is in foreground and NOT already handling via CallKit
+              if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+                 Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CallPage(
+                      channelName: data['channelName'] ?? '',
+                      callerId: data['callerId'] ?? '',
+                      calleeId: widget.userId,
+                      isCaller: false,
+                    ),
+                  ),
+                ).then((_) => _isCallOpening = false);
+              } else {
+                 await _showCallkitIncoming(data);
+                 _isCallOpening = false;
+              }
+            }
           } else {
-             await _showCallkitIncoming(data);
+            _currentCallChannel = null;
+            _isCallOpening = false;
+            FlutterRingtonePlayer().stop();
+            await FlutterCallkitIncoming.endAllCalls();
           }
+        } catch (e) {
+          debugPrint('Incoming call listener error: $e');
+          _isCallOpening = false;
         }
-      } else {
-        _currentCallChannel = null;
-        FlutterRingtonePlayer().stop();
-        await FlutterCallkitIncoming.endAllCalls();
-      }
+      });
     });
   }
 
@@ -770,36 +786,59 @@ class _InterfacePageState extends State<InterfacePage>
     _locationUpdateTimer?.cancel();
     _positionStream?.cancel();
 
+    // ON iOS, we use a continuous foreground stream with background allowance
+    // This is significantly more reliable than isolates on iOS 16+.
+    if (Platform.isIOS) {
+       _positionStream = Geolocator.getPositionStream(
+        locationSettings: AppleSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          distanceFilter: 0,
+          pauseLocationUpdatesAutomatically: false,
+          showBackgroundLocationIndicator: true,
+          allowBackgroundLocationUpdates: true,
+          activityType: ActivityType.fitness,
+        ),
+      ).listen((position) async {
+        if (!_isSharingLiveLocation || !mounted) return;
+        await _updateFirestoreLocation(sharingId, position);
+      });
+    }
+
     _locationUpdateTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       if (!_isSharingLiveLocation || !mounted) {
         timer.cancel();
         return;
       }
-      try {
-        Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.best,
-          timeLimit: const Duration(seconds: 12),
-        );
-
-        final lat = position.latitude;
-        final lng = position.longitude;
-        final heading = position.heading;
-        final speed = position.speed;
-
-        await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set({
-          'userId': widget.userId,
-          'latitude': lat,
-          'longitude': lng,
-          'heading': heading,
-          'speed': speed,
-          'timestamp': FieldValue.serverTimestamp(),
-          'userName': _userData?['name'] ?? 'Unknown',
-          'profilePicture': _userData?['profilePicture'],
-        });
-      } catch (e) {
-        debugPrint('Location update error: $e');
+      // On Android, we still use the periodic fetch since the Isolate is running
+      if (Platform.isAndroid) {
+          try {
+            Position position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.best,
+              timeLimit: const Duration(seconds: 12),
+            );
+            await _updateFirestoreLocation(sharingId, position);
+          } catch (e) {
+            debugPrint('Location update error: $e');
+          }
       }
     });
+  }
+
+  Future<void> _updateFirestoreLocation(String sharingId, Position position) async {
+    try {
+      await FirebaseFirestore.instance.collection('liveLocations').doc(sharingId).set({
+        'userId': widget.userId,
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'heading': position.heading,
+        'speed': position.speed,
+        'timestamp': FieldValue.serverTimestamp(),
+        'userName': _userData?['name'] ?? 'Unknown',
+        'profilePicture': _userData?['profilePicture'],
+      });
+    } catch (e) {
+      debugPrint('Firestore update error: $e');
+    }
   }
 
   Future<void> _resumeLiveLocationSharing() async {

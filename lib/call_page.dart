@@ -32,14 +32,15 @@ class _CallPageState extends State<CallPage> {
   bool _isSpeakerOn = false;
   int? _remoteUid;
   StreamSubscription? _callStreamSubscription;
+  bool _isEngineInitialized = false;
 
   @override
   void initState() {
     super.initState();
     FlutterRingtonePlayer().stop();
-    // Delay Agora initialization to ensure CallKit audio session is ready
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) _initAgora();
+    // 1-second delay to ensure CallKit/System-UI has handed off audio focus
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted && !_isEngineInitialized) _initAgora();
     });
     _listenToCallStatus();
   }
@@ -69,11 +70,13 @@ class _CallPageState extends State<CallPage> {
       channelProfile: ChannelProfileType.channelProfileCommunication,
     ));
 
-    // Optimize audio for voice
+    // Optimize audio for low-latency voice
     await _engine.setAudioProfile(
-      profile: AudioProfileType.audioProfileDefault,
-      scenario: AudioScenarioType.audioScenarioDefault,
+      profile: AudioProfileType.audioProfileSpeechStandard,
+      scenario: AudioScenarioType.audioScenarioChatroom,
     );
+    
+    _isEngineInitialized = true;
 
     _engine.registerEventHandler(
       RtcEngineEventHandler(
