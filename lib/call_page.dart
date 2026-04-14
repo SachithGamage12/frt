@@ -38,18 +38,40 @@ class _CallPageState extends State<CallPage> {
   void initState() {
     super.initState();
     FlutterRingtonePlayer().stop();
-    // 2-second safety delay to allow the System Audio Session to transition
-    // from 'Ringing' to 'Active' before the Agora hardware lock is attempted.
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted && !_isEngineInitialized) _initAgora();
+    
+    // PRE-WARM: Initialize the engine early without locking hardware
+    _initEnginePreWarm();
+
+    // The Handoff: Lock hardware and join only after system UI settles (3s safety)
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) _joinCallSession();
     });
     
-    // Ignore termination snapshots for the first 5 seconds to prevent 'Race-to-Cut' disconnects
+    // Resilience: Wait 5 seconds before listening for remote-end events 
+    // to avoid 'Race-to-Cut' on startup.
     Future.delayed(const Duration(seconds: 5), () {
        if (mounted) _listenToCallStatus();
     });
   }
 
+  Future<void> _initEnginePreWarm() async {
+     try {
+       _engine = createAgoraRtcEngine();
+       await _engine.initialize(RtcEngineContext(
+         appId: appId,
+         channelProfile: ChannelProfileType.channelProfileCommunication,
+       ));
+       await _engine.setAudioProfile(
+         profile: AudioProfileType.audioProfileSpeechStandard,
+         scenario: AudioScenarioType.audioScenarioDefault,
+       );
+       _isEngineInitialized = true;
+     } catch (e) {
+       debugPrint('Engine pre-warm error: $e');
+     }
+  }
+
+  int _retryCount = 0;
   void _listenToCallStatus() {
     final String targetId = widget.isCaller ? widget.calleeId : widget.callerId;
     _callStreamSubscription = FirebaseFirestore.instance
@@ -58,34 +80,28 @@ class _CallPageState extends State<CallPage> {
         .snapshots()
         .listen((snapshot) {
       if (!snapshot.exists || (snapshot.data()?['status'] == 'ended')) {
-        // Automatically close call if document is deleted or marked as ended
-        _leaveChannel();
+        // Resilience: If doc is missing, wait 2 seconds before giving up
+        // This stops disconnects caused by Firestore's internal sync latency.
+        _retryCount++;
+        if (_retryCount > 2) {
+           _leaveChannel();
+        }
+      } else {
+        _retryCount = 0;
       }
     });
   }
 
-  Future<void> _initAgora() async {
-    // Determine permissions needed
+  Future<void> _joinCallSession() async {
+    if (!mounted) return;
     await [Permission.microphone].request();
-
-    // Create RtcEngine
-    _engine = createAgoraRtcEngine();
-    await _engine.initialize(RtcEngineContext(
-      appId: appId,
-      channelProfile: ChannelProfileType.channelProfileCommunication,
-    ));
-
-    await _engine.setAudioProfile(
-      profile: AudioProfileType.audioProfileSpeechStandard,
-      scenario: AudioScenarioType.audioScenarioDefault,
-    );
-    
-    _isEngineInitialized = true;
 
     _engine.registerEventHandler(
       RtcEngineEventHandler(
-        onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
+        onJoinChannelSuccess: (RtcConnection connection, int elapsed) async {
           debugPrint("Local user uid:${connection.localUid} joined the channel");
+          await _engine.setEnableSpeakerphone(true);
+          if (mounted) setState(() => _isSpeakerOn = true);
         },
         onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
           debugPrint("Remote user uid:$remoteUid joined the channel");
@@ -98,39 +114,39 @@ class _CallPageState extends State<CallPage> {
           setState(() {
             _remoteUid = null;
           });
-          // End call if remote user leaves
           _leaveChannel();
         },
       ),
     );
 
-    // Join channel
-    await _engine.joinChannel(
-      token: '', // No token required for testing mode
-      channelId: widget.channelName,
-      options: const ChannelMediaOptions(
-        clientRoleType: ClientRoleType.clientRoleBroadcaster,
-        autoSubscribeAudio: true,
-        publishMicrophoneTrack: true,
-      ),
-      uid: 0, // Agora generates random UID
-    );
-
-    // Initially route audio to speaker for tracking app convenience
-    await _engine.setEnableSpeakerphone(true);
-    setState(() => _isSpeakerOn = true);
+    try {
+      await _engine.joinChannel(
+        token: '',
+        channelId: widget.channelName,
+        uid: 0,
+        options: const ChannelMediaOptions(
+          autoSubscribeAudio: true,
+          publishMicrophoneTrack: true,
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Join channel error: $e');
+    }
   }
 
   Future<void> _leaveChannel() async {
     try {
-      await _engine.leaveChannel();
-      await _engine.release();
+      if (_isEngineInitialized) {
+        await _engine.leaveChannel();
+        await _engine.release();
+        _isEngineInitialized = false;
+      }
     } catch (e) {
       debugPrint("Error leaving channel: $e");
     }
     
     // Clear ringing state from Firestore
-    // Always clear the callee's document ID as that is the primary signaling point
     try {
       await FirebaseFirestore.instance.collection('calls').doc(widget.calleeId).delete();
     } catch(_) {}

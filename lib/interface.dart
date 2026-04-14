@@ -22,6 +22,7 @@ import 'location_view_page.dart';
 import 'call_page.dart';
 import 'style_utils.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+import 'globals.dart';
 
 class InterfacePage extends StatefulWidget {
   final String userId;
@@ -373,10 +374,9 @@ class _InterfacePageState extends State<InterfacePage>
               _isCallOpening = true;
               _currentCallChannel = data['channelName'];
               
-              // Only show local UI if app is in foreground and NOT already handling via CallKit
+              // Only navigate if app is in a stable state
               if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-                 Navigator.push(
-                  context,
+                 navigatorKey.currentState?.push(
                   MaterialPageRoute(
                     builder: (context) => CallPage(
                       channelName: data['channelName'] ?? '',
@@ -759,8 +759,10 @@ class _InterfacePageState extends State<InterfacePage>
     _locationUpdateTimer?.cancel();
     _positionStream?.cancel();
 
-    // ON iOS, we use a continuous foreground stream with background allowance
-    // This is significantly more reliable than isolates on iOS 16+.
+    // ON iOS, we use a continuous foreground stream with background allowance.
+    // We add a 'Watchdog' by tracking the last update time.
+    DateTime lastUpdate = DateTime.now();
+
     if (Platform.isIOS) {
        _positionStream = Geolocator.getPositionStream(
         locationSettings: AppleSettings(
@@ -773,6 +775,7 @@ class _InterfacePageState extends State<InterfacePage>
         ),
       ).listen((position) async {
         if (!_isSharingLiveLocation || !mounted) return;
+        lastUpdate = DateTime.now();
         await _updateFirestoreLocation(sharingId, position);
       });
     }
@@ -782,6 +785,16 @@ class _InterfacePageState extends State<InterfacePage>
         timer.cancel();
         return;
       }
+
+      // WATCHDOG: If no movement for 60s, kick-start the location daemon
+      if (Platform.isIOS && DateTime.now().difference(lastUpdate).inSeconds > 60) {
+         try {
+           Position? p = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
+           _updateFirestoreLocation(sharingId, p);
+           lastUpdate = DateTime.now();
+         } catch(_) {}
+      }
+
       // On Android, we still use the periodic fetch since the Isolate is running
       if (Platform.isAndroid) {
           try {
