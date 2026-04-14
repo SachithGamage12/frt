@@ -74,6 +74,30 @@ class _InterfacePageState extends State<InterfacePage>
     _listenForIncomingCalls();
     _checkFirstTime();
     _listenForCallKitEvents();
+    
+    // Cold-Start Handoff: Check if we were launched by an 'Answer' action
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkColdStartCall());
+  }
+
+  void _checkColdStartCall() {
+    if (InitialCallState.hasPendingCall && InitialCallState.targetChannel != null) {
+      final channelName = InitialCallState.targetChannel!;
+      final callerId = InitialCallState.targetCallerId ?? 'unknown';
+      
+      InitialCallState.clear(); // Consume the event
+      
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CallPage(
+            channelName: channelName,
+            callerId: callerId,
+            calleeId: widget.userId,
+            isCaller: false,
+          ),
+        ),
+      );
+    }
   }
 
   void _listenForCallKitEvents() {
@@ -253,8 +277,10 @@ class _InterfacePageState extends State<InterfacePage>
 
   Future<void> _checkFirstTime() async {
     final prefs = await SharedPreferences.getInstance();
-    bool hasSeenTour = prefs.getBool('hasSeenTour') ?? false;
-    if (!hasSeenTour) {
+    // User requested "show always" unless "never show again" is clicked
+    bool isTourHiddenPermanently = prefs.getBool('hideTourPermanently') ?? false;
+    
+    if (!isTourHiddenPermanently) {
       if (mounted) {
         setState(() {
           _showTour = true;
@@ -348,6 +374,21 @@ class _InterfacePageState extends State<InterfacePage>
                     }
                   },
                   child: Text(_tourStep == 5 ? "GOT IT!" : "NEXT", style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                ),
+              ),
+              const SizedBox(height: 15),
+              TextButton(
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('hideTourPermanently', true);
+                  setState(() {
+                    _showTour = false;
+                    _tourStep = 0;
+                  });
+                },
+                child: const Text(
+                  "NEVER SHOW AGAIN",
+                  style: TextStyle(color: Colors.white24, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2),
                 ),
               ),
             ],

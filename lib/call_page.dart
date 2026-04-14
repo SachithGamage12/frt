@@ -26,7 +26,8 @@ class CallPage extends StatefulWidget {
 }
 
 class _CallPageState extends State<CallPage> {
-  final String appId = 'ca5bbd43c13b42229ac1ac316fc6e13d'; // Agora App ID (Testing Mode)
+  final String appId =
+      'ca5bbd43c13b42229ac1ac316fc6e13d'; // Agora App ID (Testing Mode)
   late RtcEngine _engine;
   bool _isMuted = false;
   bool _isSpeakerOn = false;
@@ -38,7 +39,7 @@ class _CallPageState extends State<CallPage> {
   void initState() {
     super.initState();
     FlutterRingtonePlayer().stop();
-    
+
     // PRE-WARM: Initialize the engine early without locking hardware
     _initEnginePreWarm();
 
@@ -46,29 +47,31 @@ class _CallPageState extends State<CallPage> {
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) _joinCallSession();
     });
-    
-    // Resilience: Wait 5 seconds before listening for remote-end events 
+
+    // Resilience: Wait 5 seconds before listening for remote-end events
     // to avoid 'Race-to-Cut' on startup.
     Future.delayed(const Duration(seconds: 5), () {
-       if (mounted) _listenToCallStatus();
+      if (mounted) _listenToCallStatus();
     });
   }
 
   Future<void> _initEnginePreWarm() async {
-     try {
-       _engine = createAgoraRtcEngine();
-       await _engine.initialize(RtcEngineContext(
-         appId: appId,
-         channelProfile: ChannelProfileType.channelProfileCommunication,
-       ));
-       await _engine.setAudioProfile(
-         profile: AudioProfileType.audioProfileSpeechStandard,
-         scenario: AudioScenarioType.audioScenarioDefault,
-       );
-       _isEngineInitialized = true;
-     } catch (e) {
-       debugPrint('Engine pre-warm error: $e');
-     }
+    try {
+      _engine = createAgoraRtcEngine();
+      await _engine.initialize(
+        RtcEngineContext(
+          appId: appId,
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+        ),
+      );
+      await _engine.setAudioProfile(
+        profile: AudioProfileType.audioProfileSpeechStandard,
+        scenario: AudioScenarioType.audioScenarioDefault,
+      );
+      _isEngineInitialized = true;
+    } catch (e) {
+      debugPrint('Engine pre-warm error: $e');
+    }
   }
 
   int _retryCount = 0;
@@ -79,17 +82,17 @@ class _CallPageState extends State<CallPage> {
         .doc(targetId)
         .snapshots()
         .listen((snapshot) {
-      if (!snapshot.exists || (snapshot.data()?['status'] == 'ended')) {
-        // Resilience: If doc is missing, wait 2 seconds before giving up
-        // This stops disconnects caused by Firestore's internal sync latency.
-        _retryCount++;
-        if (_retryCount > 2) {
-           _leaveChannel();
-        }
-      } else {
-        _retryCount = 0;
-      }
-    });
+          if (!snapshot.exists || (snapshot.data()?['status'] == 'ended')) {
+            // Resilience: If doc is missing, wait 2 seconds before giving up
+            // This stops disconnects caused by Firestore's internal sync latency.
+            _retryCount++;
+            if (_retryCount > 2) {
+              _leaveChannel();
+            }
+          } else {
+            _retryCount = 0;
+          }
+        });
   }
 
   Future<void> _joinCallSession() async {
@@ -99,7 +102,9 @@ class _CallPageState extends State<CallPage> {
     _engine.registerEventHandler(
       RtcEngineEventHandler(
         onJoinChannelSuccess: (RtcConnection connection, int elapsed) async {
-          debugPrint("Local user uid:${connection.localUid} joined the channel");
+          debugPrint(
+            "Local user uid:${connection.localUid} joined the channel",
+          );
           await _engine.setEnableSpeakerphone(true);
           if (mounted) setState(() => _isSpeakerOn = true);
         },
@@ -109,7 +114,11 @@ class _CallPageState extends State<CallPage> {
             _remoteUid = remoteUid;
           });
         },
-        onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
+        onUserOffline: (
+          RtcConnection connection,
+          int remoteUid,
+          UserOfflineReasonType reason,
+        ) {
           debugPrint("Remote user uid:$remoteUid left the channel");
           setState(() {
             _remoteUid = null;
@@ -145,14 +154,17 @@ class _CallPageState extends State<CallPage> {
     } catch (e) {
       debugPrint("Error leaving channel: $e");
     }
-    
+
     // Clear ringing state from Firestore
     try {
-      await FirebaseFirestore.instance.collection('calls').doc(widget.calleeId).delete();
-    } catch(_) {}
-    
+      await FirebaseFirestore.instance
+          .collection('calls')
+          .doc(widget.calleeId)
+          .delete();
+    } catch (_) {}
+
     await FlutterCallkitIncoming.endAllCalls();
-    
+
     if (mounted) {
       Navigator.pop(context);
     }
@@ -196,26 +208,35 @@ class _CallPageState extends State<CallPage> {
             Text(
               _remoteUid != null ? "CONNECTED" : "CALLING...",
               style: TextStyle(
-                fontSize: 28, 
-                fontWeight: FontWeight.w900, 
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
                 color: Colors.white,
                 letterSpacing: 2.0,
                 shadows: [
-                  Shadow(color: AppColors.primary.withOpacity(0.5), blurRadius: 10),
+                  Shadow(
+                    color: AppColors.primary.withOpacity(0.5),
+                    blurRadius: 10,
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
             Text(
               "Session: ${widget.channelName}",
-              style: const TextStyle(fontSize: 14, color: Colors.white38, letterSpacing: 1.2),
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.white38,
+                letterSpacing: 1.2,
+              ),
             ),
             const Spacer(),
             Container(
               padding: const EdgeInsets.symmetric(vertical: 40),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.05),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(40),
+                ),
                 border: Border.all(color: Colors.white10),
               ),
               child: Row(
@@ -265,16 +286,24 @@ class _CallPageState extends State<CallPage> {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: isEndCall 
-              ? color.withOpacity(0.3) 
-              : (active ? color.withOpacity(0.2) : Colors.white10),
+          color:
+              isEndCall
+                  ? color.withOpacity(0.3)
+                  : (active ? color.withOpacity(0.2) : Colors.white10),
           shape: BoxShape.circle,
           border: Border.all(
-            color: isEndCall ? color.withOpacity(0.5) : (active ? color.withOpacity(0.4) : Colors.transparent),
+            color:
+                isEndCall
+                    ? color.withOpacity(0.5)
+                    : (active ? color.withOpacity(0.4) : Colors.transparent),
             width: 2,
           ),
         ),
-        child: Icon(icon, color: isEndCall ? Colors.white : color, size: iconSize),
+        child: Icon(
+          icon,
+          color: isEndCall ? Colors.white : color,
+          size: iconSize,
+        ),
       ),
     );
   }

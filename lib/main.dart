@@ -12,10 +12,40 @@ import 'payment_page.dart';
 import 'admin_panel.dart';
 import 'style_utils.dart';
 import 'globals.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'call_page.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
+  
+  // Detect if this is a calling signal
+  final data = message.data;
+  if (data['type'] == 'call' || data['channelName'] != null) {
+      final params = CallKitParams(
+        id: data['channelName'] ?? 'incoming_call',
+        nameCaller: data['callerName'] ?? 'Family Tracking',
+        appName: 'FRT',
+        type: 0,
+        duration: 30000,
+        android: const AndroidParams(
+          isCustomNotification: true,
+          isShowLogo: true,
+          ringtonePath: 'system_ringtone_default',
+        ),
+        ios: const IOSParams(
+          iconName: 'AppIcon',
+          handleType: 'generic',
+          supportsVideo: false,
+          audioSessionMode: 'default',
+          audioSessionActive: true,
+        ),
+        extra: data,
+      );
+      await FlutterCallkitIncoming.showCallkitIncoming(params);
+  }
 }
 
 void main() async {
@@ -24,6 +54,21 @@ void main() async {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     _initializeFCM(); // Non-blocking
+    
+    // Listen for Cold-Start CallKit actions (App opened by Answer)
+    FlutterCallkitIncoming.onEvent.listen((event) {
+       if (event == null) return;
+       if (event.event == 'ACTION_CALL_ACCEPT') {
+          final extra = event.body['extra'];
+          if (extra != null && extra['channelName'] != null) {
+             InitialCallState.targetChannel = extra['channelName'];
+             InitialCallState.targetCallerId = extra['callerId'];
+             InitialCallState.targetCallerName = extra['callerName'];
+             InitialCallState.hasPendingCall = true;
+          }
+       }
+    });
+
   } catch (e) {
     print("Firebase initialization error: $e");
   }
