@@ -29,8 +29,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         id: data['channelName'] ?? 'incoming_call',
         nameCaller: data['callerName'] ?? 'Family Tracking',
         appName: 'FRT',
+        handle: 'Incoming Voice Call',
         avatar: data['callerAvatar'],
         type: 0,
+        textAccept: 'ANSWER',
+        textDecline: 'DECLINE',
         duration: 30000,
         extra: data,
         android: const AndroidParams(
@@ -42,7 +45,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           iconName: 'AppIcon',
           handleType: 'generic',
           supportsVideo: false,
-          audioSessionMode: 'default',
+          audioSessionMode: 'voiceChat',
           audioSessionActive: true,
         ),
       );
