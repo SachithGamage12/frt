@@ -497,6 +497,7 @@ class _InterfacePageState extends State<InterfacePage>
       'priority': 'high',
       'timestamp': FieldValue.serverTimestamp(),
       'fcmToken': targetUserDoc.data()?['fcmToken'],
+      'voipToken': targetUserDoc.data()?['voipToken'],
       'platform': targetUserDoc.data()?['platform'],
     };
 

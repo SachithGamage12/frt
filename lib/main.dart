@@ -14,6 +14,8 @@ import 'style_utils.dart';
 import 'globals.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'call_page.dart';
 
 @pragma('vm:entry-point')
@@ -127,18 +129,62 @@ Future<void> _initializeFCM() async {
     // Get and store the token
     String? token = await messaging.getToken();
     if (token != null) {
-      print("FCM Token: $token");
+      debugPrint("FCM Token: $token");
+    }
+
+    // VOIP BRIDGE: Listen for token and call actions from native iOS
+    if (Platform.isIOS) {
+      const channel = MethodChannel('com.frt.voip');
+      channel.setMethodCallHandler((call) async {
+        if (call.method == 'voipToken') {
+          final voipToken = call.arguments as String;
+          final prefs = await SharedPreferences.getInstance();
+          final userId = prefs.getString('mobile');
+          if (userId != null) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(userId)
+                .update({
+                  'voipToken': voipToken, 
+                  'platform': 'ios',
+                  'lastActive': FieldValue.serverTimestamp(),
+                });
+            debugPrint("Synced VoIP Token to Firestore: $voipToken");
+          }
+        } else if (call.method == 'callAccepted') {
+          final data = call.arguments;
+          if (data != null) {
+             InitialCallState.targetChannel = data['channelName'];
+             InitialCallState.targetCallerId = data['callerId'];
+             InitialCallState.targetCallerName = data['callerName'];
+             InitialCallState.hasPendingCall = true;
+             
+             if (navigatorKey.currentState != null) {
+                navigatorKey.currentState?.push(
+                  MaterialPageRoute(
+                    builder: (context) => CallPage(
+                      channelName: data['channelName'],
+                      callerId: data['callerId'] ?? 'unknown',
+                      calleeId: 'current_user',
+                      isCaller: false,
+                    ),
+                  ),
+                );
+             }
+          }
+        } else if (call.method == 'callEnded') {
+          FlutterRingtonePlayer().stop();
+          // Force disconnect any active Agora session if applicable
+        }
+      });
     }
 
     // Handle Foreground Notifications
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Got a message whilst in the foreground!');
-      if (message.notification != null) {
-        print('Message also contained a notification: ${message.notification?.title}');
-      }
+      debugPrint('Got a foreground signal: ${message.data}');
     });
   } catch (e) {
-    print("Error initializing FCM: $e");
+    debugPrint("Error initializing FCM: $e");
   }
 }
 

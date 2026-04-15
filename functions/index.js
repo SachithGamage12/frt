@@ -8,8 +8,8 @@ admin.initializeApp();
 setGlobalOptions({ region: "asia-south1" });
 
 /**
- * Cloud Function to handle incoming calls.
- * This has been hardened for iOS Background Wake-Up.
+ * Cloud Function Phase 14: VoIP-Core Edition.
+ * Handles cross-platform call signaling with specialized iOS PushKit support.
  */
 exports.oncallcreated = onDocumentCreated("calls/{userId}", async (event) => {
     const snapshot = event.data;
@@ -20,47 +20,64 @@ exports.oncallcreated = onDocumentCreated("calls/{userId}", async (event) => {
 
     if (callData.status !== "ringing") return null;
 
+    // Fetch target user metadata for platform-specific routing
+    const userDoc = await admin.firestore().collection("users").doc(targetUserId).get();
+    const userData = userDoc.data();
+    const platform = userData?.platform || "android";
+
     const message = {
         token: callData.fcmToken,
-        notification: {
-            title: "Incoming Voice Call",
-            body: `${callData.callerName} is calling you...`,
-        },
         data: {
             type: "call",
             channelName: callData.channelName,
             callerId: callData.callerId,
             callerName: callData.callerName,
             callerAvatar: callData.callerAvatar || "",
-            // Add a click_action for extra reliability on legacy devices
             click_action: "FLUTTER_NOTIFICATION_CLICK",
         },
         android: {
             priority: "high",
-            ttl: 0,
-        },
-        apns: {
-            headers: {
-                "apns-priority": "10", // Crucial for immediate screen wake
-                "apns-push-type": "alert",
-                "apns-expiration": "0", // Deliver immediately or fail (don't queue)
-            },
-            payload: {
-                aps: {
-                    "content-available": 1, // Wake background isolate
-                    "mutable-content": 1,   // Allow CallKit to intercept
-                    sound: "default",
-                    category: "incoming_call",
-                },
-            },
+            ttl: 30000, // 30 seconds
         },
     };
 
+    // Platform-Specific Routing
+    if (platform === "ios") {
+        message.apns = {
+            headers: {
+                "apns-priority": "10",
+                "apns-push-type": "voip", // CRITICAL for PushKit wake-up
+                "apns-topic": "com.sachith.familytrack.ios.voip",
+                "apns-expiration": Math.floor(Date.now() / 1000) + 30,
+            },
+            payload: {
+                aps: {
+                    "content-available": 1,
+                    "mutable-content": 1,
+                    sound: "default",
+                },
+            },
+        };
+        // Clean notification block to ensure pure background data delivery to PushKit
+        delete message.notification;
+    } else {
+        // Standard Android high-priority notification
+        message.notification = {
+            title: "Incoming Voice Call",
+            body: `${callData.callerName} is calling you...`,
+        };
+    }
+
     try {
-        await admin.messaging().send(message);
-        console.log(`Successfully sent wake-up signal to ${targetUserId}`);
+        const response = await admin.messaging().send(message);
+        console.log(`✅ Signal sent to ${targetUserId} (${platform}):`, response);
+        
+        await snapshot.ref.update({
+            pushSent: true,
+            pushSentAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
     } catch (error) {
-        console.error("Error sending wake-up signal:", error);
+        console.error("❌ Error sending wake-up signal:", error.message);
     }
 
     return null;
