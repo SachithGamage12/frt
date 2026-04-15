@@ -6,7 +6,6 @@ import GoogleMaps
 import flutter_foreground_task
 import PushKit
 import CallKit
-import flutter_callkit_incoming
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, PKPushRegistryDelegate, CXProviderDelegate {
@@ -38,13 +37,12 @@ import flutter_callkit_incoming
         voipRegistry.delegate = self
         voipRegistry.desiredPushTypes = [.voIP]
         
-        // Setup CallKit Configuration
+        // Setup CallKit Configuration (Pure Native - No Conflicts)
         let config = CXProviderConfiguration(localizedName: "FRT")
         config.supportsVideo = false
         config.maximumCallsPerCallGroup = 1
         config.supportedHandleTypes = [.generic]
         
-        // Try to load AppIcon for the CallKit UI
         if let iconImage = UIImage(named: "AppIcon") {
             config.iconTemplateImageData = iconImage.pngData()
         }
@@ -60,11 +58,9 @@ import flutter_callkit_incoming
     // MARK: - PKPushRegistryDelegate
     
     func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
-        // Convert token to string
         let token = pushCredentials.token.map { String(format: "%02.2hhx", $0) }.joined()
-        print("📱 VoIP Token Generated: \(token)")
+        print("📱 Native VoIP Token: \(token)")
         
-        // Send VoIP Token to Flutter via Method Channel
         if let controller = window?.rootViewController as? FlutterViewController {
             let channel = FlutterMethodChannel(name: "com.frt.voip", binaryMessenger: controller.binaryMessenger)
             channel.invokeMethod("voipToken", arguments: token)
@@ -72,12 +68,19 @@ import flutter_callkit_incoming
     }
     
     func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
-        print("📞 VoIP Push Received in Background")
+        print("📞 Native VoIP Signal Intercepted")
         
         let data = payload.dictionaryPayload
+        
+        // CRASH PROTECTION: Use guard to ensure vital data is present
+        guard let channelName = data["channelName"] as? String else {
+            print("❌ VoIP Warning: Missing channelName in payload")
+            completion()
+            return
+        }
+        
         let callerName = data["callerName"] as? String ?? "Family Member"
         let callerId = data["callerId"] as? String ?? "unknown"
-        let channelName = data["channelName"] as? String ?? UUID().uuidString
         
         let uuid = UUID()
         let update = CXCallUpdate()
@@ -86,13 +89,14 @@ import flutter_callkit_incoming
         update.hasVideo = false
         update.supportsHolding = false
         
-        // REPORT CALL TO SYSTEM (This wakes up the screen even if locked)
+        // REPORT CALL
         callProvider.reportNewIncomingCall(with: uuid, update: update) { error in
             if error == nil {
-                // Store metadata in standard defaults for retrieval after app launch
                 UserDefaults.standard.set(channelName, forKey: "pendingCallChannel")
                 UserDefaults.standard.set(callerId, forKey: "pendingCallerId")
                 UserDefaults.standard.set(callerName, forKey: "pendingCallerName")
+            } else {
+                print("❌ CallKit Report Error: \(error!.localizedDescription)")
             }
             completion()
         }
@@ -107,7 +111,6 @@ import flutter_callkit_incoming
         let callerId = UserDefaults.standard.string(forKey: "pendingCallerId") ?? ""
         let callerName = UserDefaults.standard.string(forKey: "pendingCallerName") ?? ""
         
-        // Bridge the Answer action to Flutter
         if let controller = window?.rootViewController as? FlutterViewController {
             let channel = FlutterMethodChannel(name: "com.frt.voip", binaryMessenger: controller.binaryMessenger)
             channel.invokeMethod("callAccepted", arguments: [

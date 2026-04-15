@@ -8,8 +8,8 @@ admin.initializeApp();
 setGlobalOptions({ region: "asia-south1" });
 
 /**
- * Cloud Function Phase 14: VoIP-Core Edition.
- * Handles cross-platform call signaling with specialized iOS PushKit support.
+ * Cloud Function Phase 16: Crash-Proof VoIP.
+ * Optimized for Manual Native PushKit/CallKit Bridge.
  */
 exports.oncallcreated = onDocumentCreated("calls/{userId}", async (event) => {
     const snapshot = event.data;
@@ -20,11 +20,12 @@ exports.oncallcreated = onDocumentCreated("calls/{userId}", async (event) => {
 
     if (callData.status !== "ringing") return null;
 
-    // Fetch target user metadata for platform-specific routing
+    // Fetch target user platform
     const userDoc = await admin.firestore().collection("users").doc(targetUserId).get();
     const userData = userDoc.data();
     const platform = userData?.platform || "android";
 
+    // BASE DATA PAYLOAD
     const message = {
         token: callData.fcmToken,
         data: {
@@ -33,51 +34,54 @@ exports.oncallcreated = onDocumentCreated("calls/{userId}", async (event) => {
             callerId: callData.callerId,
             callerName: callData.callerName,
             callerAvatar: callData.callerAvatar || "",
-            click_action: "FLUTTER_NOTIFICATION_CLICK",
-        },
-        android: {
-            priority: "high",
-            ttl: 30000, // 30 seconds
         },
     };
 
-    // Platform-Specific Routing
     if (platform === "ios") {
+        /**
+         * 🛡️ iOS VOIP HARDENING (Phase 16)
+         * CRITICAL: We DO NOT include a 'notification' block for iOS VoIP.
+         * Pure data messages are required to trigger the native PKPushRegistry delegate
+         * and allow CallKit to report the call WITHOUT the OS killing the app.
+         */
         message.apns = {
             headers: {
                 "apns-priority": "10",
-                "apns-push-type": "voip", // CRITICAL for PushKit wake-up
-                "apns-topic": "com.sachith.familytrack.ios.voip",
-                "apns-expiration": Math.floor(Date.now() / 1000) + 30,
+                "apns-push-type": "voip",
+                "apns-topic": "com.sachith.familytrack.ios.voip", // bundleID.voip
+                "apns-expiration": "0", // Deliver immediately or drop
             },
             payload: {
                 aps: {
                     "content-available": 1,
-                    "mutable-content": 1,
-                    sound: "default",
+                    // Note: No 'alert' body here to ensure manual system UI handles it
                 },
             },
         };
-        // Clean notification block to ensure pure background data delivery to PushKit
-        delete message.notification;
     } else {
-        // Standard Android high-priority notification
+        /**
+         * 🤖 Android standard handling
+         */
         message.notification = {
             title: "Incoming Voice Call",
             body: `${callData.callerName} is calling you...`,
+        };
+        message.android = {
+            priority: "high",
+            ttl: 0,
         };
     }
 
     try {
         const response = await admin.messaging().send(message);
-        console.log(`✅ Signal sent to ${targetUserId} (${platform}):`, response);
+        console.log(`✅ VoIP Signal sent to ${targetUserId} (${platform}):`, response);
         
         await snapshot.ref.update({
             pushSent: true,
             pushSentAt: admin.firestore.FieldValue.serverTimestamp(),
         });
     } catch (error) {
-        console.error("❌ Error sending wake-up signal:", error.message);
+        console.error("❌ VoIP Error:", error.message);
     }
 
     return null;
