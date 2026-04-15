@@ -38,20 +38,14 @@ class _CallPageState extends State<CallPage> {
   @override
   void initState() {
     super.initState();
+    // Stop all system ringtones immediately to clear audio hardware
     FlutterRingtonePlayer().stop();
 
-    // PRE-WARM: Initialize the engine early without locking hardware
-    _initEnginePreWarm();
-
-    // The Handoff: Lock hardware and join only after system UI settles (3s safety)
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) _joinCallSession();
-    });
-
-    // Resilience: Wait 5 seconds before listening for remote-end events
-    // to avoid 'Race-to-Cut' on startup.
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) _listenToCallStatus();
+    _initEnginePreWarm().then((_) {
+      if (mounted) {
+        _joinCallSession();
+        _listenToCallStatus();
+      }
     });
   }
 

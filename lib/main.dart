@@ -57,7 +57,21 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     _initializeFCM(); // Non-blocking
     
-    // Listen for Cold-Start CallKit actions (App opened by Answer)
+    // Check for cold start call BEFORE app initializes (Essential for Killed State)
+    final activeCalls = await FlutterCallkitIncoming.activeCalls();
+    if (activeCalls is List && activeCalls.isNotEmpty) {
+        final firstCall = activeCalls.first;
+        final extra = firstCall['extra'];
+        if (extra != null && extra['channelName'] != null) {
+             InitialCallState.targetChannel = extra['channelName'];
+             InitialCallState.targetCallerId = extra['callerId'];
+             InitialCallState.targetCallerName = extra['callerName'];
+             InitialCallState.hasPendingCall = true;
+             debugPrint("Captured Cold Start Call: ${extra['channelName']}");
+        }
+    }
+    
+    // Listen for events while app is running
     FlutterCallkitIncoming.onEvent.listen((event) {
        if (event == null) return;
        debugPrint("CallKit Global Event: ${event.event}");

@@ -461,7 +461,7 @@ class _InterfacePageState extends State<InterfacePage>
         'callerName': callData['callerName'],
       },
       android: const AndroidParams(
-        isCustomNotification: false, // Standard UI is more reliable for locked screens
+        isCustomNotification: true, 
         isShowLogo: true,
         ringtonePath: 'system_ringtone_default',
         backgroundColor: '#0955fa',
@@ -471,7 +471,7 @@ class _InterfacePageState extends State<InterfacePage>
         iconName: 'AppIcon',
         handleType: 'generic',
         supportsVideo: false,
-        audioSessionMode: 'default',
+        audioSessionMode: 'voiceChat',
         audioSessionActive: true,
       ),
     );
@@ -481,8 +481,12 @@ class _InterfacePageState extends State<InterfacePage>
   void _initiateCall(String targetUserId, String targetUserName) async {
     final channelName = 'room_${widget.userId}_$targetUserId';
     
-    // Industrial Payload: Includes status and type for FCM triggering
-    // Added priority hints for background wake-up
+    // Fetch target user's FCM token and platform for VoIP push
+    final targetUserDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(targetUserId)
+        .get();
+        
     final callData = {
       'callerId': widget.userId,
       'callerName': _userData?['name'] ?? 'Family Member',
@@ -490,8 +494,10 @@ class _InterfacePageState extends State<InterfacePage>
       'channelName': channelName,
       'status': 'ringing',
       'type': 'call',
-      'priority': 'high', // Signal to backend
+      'priority': 'high',
       'timestamp': FieldValue.serverTimestamp(),
+      'fcmToken': targetUserDoc.data()?['fcmToken'],
+      'platform': targetUserDoc.data()?['platform'],
     };
 
     try { await FirebaseFirestore.instance.collection('calls').doc(targetUserId).set(callData); } catch(_) {}
