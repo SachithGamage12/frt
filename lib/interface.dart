@@ -1318,6 +1318,12 @@ class _InterfacePageState extends State<InterfacePage>
       ),
       body: Stack(
         children: [
+          Positioned(
+            top: 20,
+            left: 20,
+            right: 20,
+            child: _buildVoIPStatus(),
+          ),
           if (_isLoading)
             const Center(child: CircularProgressIndicator())
           else if (_userData == null)
@@ -1329,6 +1335,8 @@ class _InterfacePageState extends State<InterfacePage>
                 if (_isSharingLiveLocation)
                   _buildLiveStatusBar(),
                 
+                const SizedBox(height: 10),
+                _buildVoIPStatus(),
                 const SizedBox(height: 10),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -1904,6 +1912,54 @@ class _InterfacePageState extends State<InterfacePage>
 
 
   void _checkLocationAccuracy_REDUNDANT() {} // Placeholder for removal target
+
+  Widget _buildVoIPStatus() {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: AppColors.primary.withOpacity(0.5)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.phonelink_ring, color: InitialCallState.voipToken != null ? Colors.greenAccent : Colors.orangeAccent, size: 16),
+                const SizedBox(width: 8),
+                const Text('iOS CALL ENGINE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                if (InitialCallState.voipToken == null)
+                  const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orangeAccent)),
+              ],
+            ),
+            const SizedBox(height: 5),
+            Text(
+              InitialCallState.voipToken != null ? '✅ Token Ready' : '⏳ Waiting for Apple...',
+              style: const TextStyle(color: Colors.white70, fontSize: 9),
+            ),
+            const SizedBox(height: 5),
+            TextButton(
+               style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 20)),
+               onPressed: () async {
+                  if (InitialCallState.voipToken != null) {
+                    await FirebaseFirestore.instance.collection('users').doc(widget.userId).update({
+                      'voipToken': InitialCallState.voipToken,
+                      'platform': 'ios',
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Synced!')));
+                  }
+               },
+               child: const Text('FORCE SYNC', style: TextStyle(color: AppColors.primary, fontSize: 9)),
+            )
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 @pragma('vm:entry-point')
