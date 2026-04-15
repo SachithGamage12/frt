@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>method</key>
-	<string>debugging</string>
+	<string>app-store</string>
 	<key>teamID</key>
 	<string>KMPA36RSLQ</string>
 	<key>signingStyle</key>
@@ -11,10 +11,10 @@
 	<key>provisioningProfiles</key>
 	<dict>
 		<key>com.sachith.familytrack.ios</key>
-		<string>27d3e550-7928-448f-9fd1-0b20fc6e1c78</string>
+		<string>868c84f3-6ab5-48f1-b269-1a61200898a0</string>
 	</dict>
 	<key>signingCertificate</key>
-	<string>Apple Development: Sachith Gamage (R5FK77489D)</string>
+	<string>Apple Distribution: Sachith Gamage (KMPA36RSLQ)</string>
 	<key>uploadSymbols</key>
 	<true/>
 	<key>compileBitcode</key>
