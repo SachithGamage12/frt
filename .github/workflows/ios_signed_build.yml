@@ -34,6 +34,7 @@ jobs:
           PP_PATH=$RUNNER_TEMP/temp.mobileprovision
           echo -n "$PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
           UUID=$(security cms -D -i $PP_PATH | grep -A 1 "UUID" | tail -1 | sed 's/.*<string>//;s/<\/string>.*//')
+          echo "PROFILE_UUID=$UUID" >> $GITHUB_ENV
           echo "Profile UUID: $UUID"
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
@@ -98,7 +99,7 @@ jobs:
             -resultBundlePath $RUNNER_TEMP/ResultBundle \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution: Sachith Gamage (KMPA36RSLQ)" \
-            PROVISIONING_PROFILE="868c84f3-6ab5-48f1-b269-1a61200898a0" \
+            PROVISIONING_PROFILE="$PROFILE_UUID" \
             DEVELOPMENT_TEAM=KMPA36RSLQ \
             archive 2>&1 | tee $RUNNER_TEMP/xcodebuild.log
           echo ""
