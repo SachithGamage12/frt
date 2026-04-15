@@ -7,6 +7,7 @@ class InitialCallState {
   static String? targetChannel;
   static String? targetCallerId;
   static String? targetCallerName;
+  static String? voipToken; // Added memory for iPhone address
   static bool hasPendingCall = false;
 
   static void clear() {

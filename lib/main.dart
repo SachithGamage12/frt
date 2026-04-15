@@ -138,6 +138,7 @@ Future<void> _initializeFCM() async {
       channel.setMethodCallHandler((call) async {
         if (call.method == 'voipToken') {
           final voipToken = call.arguments as String;
+          InitialCallState.voipToken = voipToken; // Save temporarily
           final prefs = await SharedPreferences.getInstance();
           final userId = prefs.getString('mobile');
           if (userId != null) {
@@ -273,14 +274,18 @@ class _FRTAnimationPageState extends State<FRTAnimationPage> with SingleTickerPr
       bool isUnlocked = doc.data()?['isAppUnlocked'] == true;
       Timestamp? expiry = doc.data()?['subscriptionExpiry'] as Timestamp?;
       
-      // Store FCM token (Safe fetch)
+      // Store FCM and VoIP tokens (Unified Sync)
       try {
         String? token = await FirebaseMessaging.instance.getToken();
-        if (token != null) {
-          await _firestore.collection('users').doc(mobile).update({'fcmToken': token});
+        final updates = <String, dynamic>{'lastActive': FieldValue.serverTimestamp()};
+        if (token != null) updates['fcmToken'] = token;
+        if (InitialCallState.voipToken != null) {
+           updates['voipToken'] = InitialCallState.voipToken;
+           updates['platform'] = 'ios';
         }
+        await _firestore.collection('users').doc(mobile).update(updates);
       } catch (e) {
-        print("Skipping FCM token update: $e");
+        print("Skipping token update: $e");
       }
 
       // Expiry Check
@@ -504,13 +509,18 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           bool isUnlocked = doc.data()?['isAppUnlocked'] == true;
           Timestamp? expiry = doc.data()?['subscriptionExpiry'] as Timestamp?;
           
+          // Store tokens (Unified Sync)
           try {
             String? token = await FirebaseMessaging.instance.getToken();
-            if (token != null) {
-              await _firestore.collection('users').doc(_mobileController.text).update({'fcmToken': token});
+            final updates = <String, dynamic>{'lastActive': FieldValue.serverTimestamp()};
+            if (token != null) updates['fcmToken'] = token;
+            if (InitialCallState.voipToken != null) {
+              updates['voipToken'] = InitialCallState.voipToken;
+              updates['platform'] = 'ios';
             }
+            await _firestore.collection('users').doc(_mobileController.text).update(updates);
           } catch (e) {
-            print("Skipping FCM token update: $e");
+            print("Skipping token update: $e");
           }
 
           if (isUnlocked && expiry != null && expiry.toDate().isBefore(DateTime.now())) {
