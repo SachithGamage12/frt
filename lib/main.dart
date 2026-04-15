@@ -151,20 +151,16 @@ Future<void> _initializeFCM() async {
                 });
             debugPrint("Synced VoIP Token to Firestore: $voipToken");
           }
-        } else if (call.method == 'callAccepted') {
-          final data = call.arguments;
-          if (data != null) {
-             InitialCallState.targetChannel = data['channelName'];
-             InitialCallState.targetCallerId = data['callerId'];
-             InitialCallState.targetCallerName = data['callerName'];
+        } else if (call.method == 'callAccepted' || call.method == 'answerAction') {
+          // Native system Answered the call
+          if (InitialCallState.targetChannel != null) {
              InitialCallState.hasPendingCall = true;
-             
              if (navigatorKey.currentState != null) {
                 navigatorKey.currentState?.push(
                   MaterialPageRoute(
                     builder: (context) => CallPage(
-                      channelName: data['channelName'],
-                      callerId: data['callerId'] ?? 'unknown',
+                      channelName: InitialCallState.targetChannel!,
+                      callerId: InitialCallState.targetCallerId ?? 'unknown',
                       calleeId: 'current_user',
                       isCaller: false,
                     ),
@@ -172,9 +168,11 @@ Future<void> _initializeFCM() async {
                 );
              }
           }
-        } else if (call.method == 'callEnded') {
+        } else if (call.method == 'endAction') {
           FlutterRingtonePlayer().stop();
-          // Force disconnect any active Agora session if applicable
+          if (navigatorKey.currentState != null) {
+             navigatorKey.currentState?.pop();
+          }
         }
       });
     }

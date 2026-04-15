@@ -495,8 +495,12 @@ class _InterfacePageState extends State<InterfacePage>
       'timestamp': FieldValue.serverTimestamp(),
       'fcmToken': targetUserDoc.data()?['fcmToken'],
       'voipToken': targetUserDoc.data()?['voipToken'],
-      'platform': targetUserDoc.data()?['platform'],
+      'platform': targetUserDoc.data()?['platform'] ?? (Platform.isIOS ? 'ios' : 'android'),
     };
+
+    InitialCallState.targetChannel = channelName;
+    InitialCallState.targetCallerId = widget.userId;
+    InitialCallState.targetCallerName = _userData?['name'] ?? 'Family Member';
 
     try { await FirebaseFirestore.instance.collection('calls').doc(targetUserId).set(callData); } catch(_) {}
 

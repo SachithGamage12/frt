@@ -3,13 +3,14 @@ import UIKit
 import FirebaseCore
 import FirebaseMessaging
 import GoogleMaps
-import flutter_foreground_task
 import PushKit
+import CallKit
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, PKPushRegistryDelegate {
+@objc class AppDelegate: FlutterAppDelegate, PKPushRegistryDelegate, CXProviderDelegate {
     
     var voipRegistry: PKPushRegistry!
+    var provider: CXProvider?
     
     override func application(
         _ application: UIApplication,
@@ -20,17 +21,18 @@ import PushKit
         }
         
         Messaging.messaging().delegate = self as? MessagingDelegate
-        
         GMSServices.provideAPIKey("AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg")
         
-        SwiftFlutterForegroundTaskPlugin.setPluginRegistrantCallback(registerPlugins)
+        // Setup CallKit Provider
+        let configuration = CXProviderConfiguration(localizedName: "FRT")
+        configuration.supportsVideo = false
+        configuration.maximumCallGroups = 1
+        configuration.supportedHandleTypes = [.generic]
         
-        if #available(iOS 10.0, *) {
-            UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
-        }
+        provider = CXProvider(configuration: configuration)
+        provider?.setDelegate(self, queue: nil)
         
-        // Setup VoIP Push (PushKit) for Token Collection ONLY
-        // We do NOT manualy manage CXProvider here to avoid plugin conflicts.
+        // Setup VoIP Push
         voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
         voipRegistry.delegate = self
         voipRegistry.desiredPushTypes = [.voIP]
@@ -39,7 +41,7 @@ import PushKit
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
     
-    // MARK: - PKPushRegistryDelegate (Token Collection Only)
+    // MARK: - PKPushRegistryDelegate
     
     func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
         let token = pushCredentials.token.map { String(format: "%02.2hhx", $0) }.joined()
@@ -52,12 +54,48 @@ import PushKit
     }
     
     func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
-        // We let the flutter_callkit_incoming plugin handle the UI to avoid 'Double Provider' crashes.
-        // But we MUST call completion() to tell the OS we received the push.
-        completion()
+        
+        let data = payload.dictionaryPayload["custom"] as? [String: Any] ?? payload.dictionaryPayload
+        let channelName = data["channelName"] as? String ?? "incoming_call"
+        let callerName = data["callerName"] as? String ?? "Family Member"
+        
+        // INSTANT REPORT: Satisfy Apple's requirement immediately
+        let update = CXCallUpdate()
+        update.remoteHandle = CXHandle(type: .generic, value: callerName)
+        update.hasVideo = false
+        
+        let uuid = UUID()
+        provider?.reportNewIncomingCall(with: uuid, update: update) { error in
+            if error == nil {
+                print("✅ Call Reported to CallKit")
+            }
+            completion()
+        }
+        
+        // Notify Flutter so it can prepare the Agora connection
+        if let controller = window?.rootViewController as? FlutterViewController {
+            let channel = FlutterMethodChannel(name: "com.frt.voip", binaryMessenger: controller.binaryMessenger)
+            channel.invokeMethod("callAccepted", arguments: data)
+        }
     }
-}
 
-func registerPlugins(registry: FlutterPluginRegistry) {
-    GeneratedPluginRegistrant.register(with: registry)
+    // MARK: - CXProviderDelegate
+    func providerDidReset(_ provider: CXProvider) {}
+
+    func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
+        action.fulfill()
+        // Signal Flutter to open the CallPage
+        if let controller = window?.rootViewController as? FlutterViewController {
+            let channel = FlutterMethodChannel(name: "com.frt.voip", binaryMessenger: controller.binaryMessenger)
+            channel.invokeMethod("answerAction", arguments: nil)
+        }
+    }
+
+    func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
+        action.fulfill()
+        if let controller = window?.rootViewController as? FlutterViewController {
+            let channel = FlutterMethodChannel(name: "com.frt.voip", binaryMessenger: controller.binaryMessenger)
+            channel.invokeMethod("endAction", arguments: nil)
+        }
+    }
 }

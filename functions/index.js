@@ -4,85 +4,72 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
-// Set global options to match your database region
-setGlobalOptions({ region: "asia-south1" });
+setGlobalOptions({ region: "us-central1" });
 
-/**
- * Cloud Function Phase 16: Crash-Proof VoIP.
- * Optimized for Manual Native PushKit/CallKit Bridge.
- */
-exports.oncallcreated = onDocumentCreated("calls/{userId}", async (event) => {
-    const snapshot = event.data;
-    if (!snapshot) return null;
+exports.sendCallNotification = onDocumentCreated("calls/{userId}", async (event) => {
+    const data = event.data.data();
+    if (!data) return;
 
-    const callData = snapshot.data();
-    const targetUserId = event.params.userId;
+    // Only send for 'ringing' status
+    if (data.status !== 'ringing') return;
 
-    if (callData.status !== "ringing") return null;
-
-    // Fetch target user platform
-    const userDoc = await admin.firestore().collection("users").doc(targetUserId).get();
-    const userData = userDoc.data();
-    const platform = userData?.platform || "android";
-
-    // BASE DATA PAYLOAD
-    const message = {
-        token: callData.fcmToken,
+    const payload = {
         data: {
-            type: "call",
-            channelName: callData.channelName,
-            callerId: callData.callerId,
-            callerName: callData.callerName,
-            callerAvatar: callData.callerAvatar || "",
-        },
+            type: 'call',
+            callerId: data.callerId,
+            callerName: data.callerName,
+            callerAvatar: data.callerAvatar || '',
+            channelName: data.channelName,
+            priority: 'high',
+        }
     };
 
-    if (platform === "ios") {
-        /**
-         * 🛡️ iOS VOIP HARDENING (Phase 16)
-         * CRITICAL: We DO NOT include a 'notification' block for iOS VoIP.
-         * Pure data messages are required to trigger the native PKPushRegistry delegate
-         * and allow CallKit to report the call WITHOUT the OS killing the app.
-         */
-        message.apns = {
-            headers: {
-                "apns-priority": "10",
-                "apns-push-type": "voip",
-                "apns-topic": "com.sachith.familytrack.ios.voip", // bundleID.voip
-                "apns-expiration": "0", // Deliver immediately or drop
-            },
-            payload: {
-                aps: {
-                    "content-available": 1,
-                    // Note: No 'alert' body here to ensure manual system UI handles it
+    // 🍏 iOS VoIP Logic (Using PushKit)
+    if (data.platform === 'ios' && data.voipToken) {
+        console.log(`Sending VoIP Push to iOS user: ${event.params.userId}`);
+        const voipMessage = {
+            token: data.voipToken,
+            data: payload.data, // For Android fallback if they use voipToken
+            apns: {
+                payload: {
+                    aps: {
+                        'content-available': 1,
+                        priority: 10,
+                    },
+                    // Custom data for the Native AppDelegate to read
+                    custom: payload.data
                 },
-            },
+                headers: {
+                    'apns-priority': '10',
+                    'apns-push-type': 'voip', // REQUIRED FOR IOS CALLS
+                    'apns-topic': 'com.frt.frt.voip' // Bundle ID + .voip
+                }
+            }
         };
-    } else {
-        /**
-         * 🤖 Android standard handling
-         */
-        message.notification = {
-            title: "Incoming Voice Call",
-            body: `${callData.callerName} is calling you...`,
+        try {
+            await admin.messaging().send(voipMessage);
+            console.log("✅ iOS VoIP Signal Sent");
+        } catch (error) {
+            console.error("❌ iOS VoIP Error:", error);
+        }
+    } 
+    
+    // 🤖 Android / Standard FCM Logic
+    if (data.fcmToken) {
+        console.log(`Sending Standard FCM to: ${event.params.userId}`);
+        const fcmMessage = {
+            token: data.fcmToken,
+            data: payload.data,
+            android: {
+                priority: 'high',
+                ttl: 0, // Instant
+            }
         };
-        message.android = {
-            priority: "high",
-            ttl: 0,
-        };
+        try {
+            await admin.messaging().send(fcmMessage);
+            console.log("✅ Standard FCM Signal Sent");
+        } catch (error) {
+            console.error("❌ FCM Error:", error);
+        }
     }
-
-    try {
-        const response = await admin.messaging().send(message);
-        console.log(`✅ VoIP Signal sent to ${targetUserId} (${platform}):`, response);
-        
-        await snapshot.ref.update({
-            pushSent: true,
-            pushSentAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-    } catch (error) {
-        console.error("❌ VoIP Error:", error.message);
-    }
-
-    return null;
 });
