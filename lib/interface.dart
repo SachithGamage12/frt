@@ -411,6 +411,16 @@ class _InterfacePageState extends State<InterfacePage>
           if (snapshot.exists) {
             final data = snapshot.data();
             if (data != null && data['status'] == 'ringing' && _currentCallChannel != data['channelName']) {
+              // GHOST FILTER: Ignore calls older than 60 seconds
+              final timestamp = data['timestamp'] as Timestamp?;
+              if (timestamp != null) {
+                final callAge = DateTime.now().difference(timestamp.toDate()).inSeconds;
+                if (callAge > 60) {
+                  debugPrint("Ignoring stale/ghost call: $callAge seconds old");
+                  return;
+                }
+              }
+
               if (_isCallOpening) return;
               _isCallOpening = true;
               _currentCallChannel = data['channelName'];
@@ -472,6 +482,7 @@ class _InterfacePageState extends State<InterfacePage>
     final channelName = 'room_${widget.userId}_$targetUserId';
     
     // Industrial Payload: Includes status and type for FCM triggering
+    // Added priority hints for background wake-up
     final callData = {
       'callerId': widget.userId,
       'callerName': _userData?['name'] ?? 'Family Member',
@@ -479,6 +490,7 @@ class _InterfacePageState extends State<InterfacePage>
       'channelName': channelName,
       'status': 'ringing',
       'type': 'call',
+      'priority': 'high', // Signal to backend
       'timestamp': FieldValue.serverTimestamp(),
     };
 
