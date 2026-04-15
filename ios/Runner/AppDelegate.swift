@@ -55,7 +55,9 @@ import CallKit
     
     func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {
         
-        let data = payload.dictionaryPayload["custom"] as? [String: Any] ?? payload.dictionaryPayload
+        // Extract and convert dictionary payload
+        let payloadDict = payload.dictionaryPayload as? [String: Any] ?? [:]
+        let data = (payloadDict["custom"] as? [String: Any]) ?? payloadDict
         let channelName = data["channelName"] as? String ?? "incoming_call"
         let callerName = data["callerName"] as? String ?? "Family Member"
         
