@@ -42,7 +42,7 @@ exports.sendCallNotification = onDocumentCreated("calls/{userId}", async (event)
                 headers: {
                     'apns-priority': '10',
                     'apns-push-type': 'voip', // REQUIRED FOR IOS CALLS
-                    'apns-topic': 'com.frt.frt.voip' // Bundle ID + .voip
+                    'apns-topic': 'com.sachith.familytrack.ios.voip' // Exact Bundle ID + .voip
                 }
             }
         };
