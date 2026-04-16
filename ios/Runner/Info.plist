@@ -80,7 +80,6 @@
 		<string>location</string>
 		<string>processing</string>
 		<string>audio</string>
-		<string>voip</string>
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>

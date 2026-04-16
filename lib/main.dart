@@ -22,7 +22,9 @@ import 'call_page.dart';
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // CRITICAL: Must be called before anything else in background isolate
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp();
+  }
 
   try {
     final data = message.data;
