@@ -20,16 +20,18 @@ import 'call_page.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // CRITICAL: Must be called before anything else in background isolate
+  WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  
-  // Detect if this is a calling signal
-  final data = message.data;
-  debugPrint("Received Background Message: $data");
-  
-  if (data['type'] == 'call' || data['channelName'] != null) {
+
+  try {
+    final data = message.data;
+    debugPrint("Background FCM: ${data['type']} / channel: ${data['channelName']}");
+
+    if (data['type'] == 'call' || data['channelName'] != null) {
       final params = CallKitParams(
-        id: data['channelName'] ?? 'incoming_call',
-        nameCaller: data['callerName'] ?? 'Family Tracking',
+        id: data['channelName'] ?? 'call_${DateTime.now().millisecondsSinceEpoch}',
+        nameCaller: data['callerName'] ?? 'Family Member',
         appName: 'FRT',
         handle: 'Incoming Voice Call',
         avatar: data['callerAvatar'],
@@ -52,6 +54,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         ),
       );
       await FlutterCallkitIncoming.showCallkitIncoming(params);
+      debugPrint("✅ CallKit shown from background");
+    }
+  } catch (e) {
+    // IMPORTANT: catch all errors - uncaught exceptions here cause iOS restart loops
+    debugPrint("Background handler error (suppressed): $e");
   }
 }
 
