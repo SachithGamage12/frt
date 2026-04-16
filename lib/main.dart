@@ -69,7 +69,7 @@ void main() async {
   try {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    _initializeFCM(); // Non-blocking
+    // Removed _initializeFCM() from here to prevent early-boot race conditions on iOS
     
     // Check for cold start call BEFORE app initializes (Essential for Killed State)
     try {
@@ -150,7 +150,16 @@ Future<void> _initializeFCM() async {
     }
 
     // Get FCM token and immediately save it to Firestore
+    NotificationSettings settings = await messaging.getNotificationSettings();
+    debugPrint("Notification Permission: ${settings.authorizationStatus}");
+    
     String? token = await messaging.getToken();
+    if (token == null && Platform.isIOS) {
+       // On iOS, sometimes we need the APNs token to be ready first
+       String? apnsToken = await messaging.getAPNSToken();
+       debugPrint("APNS Token at startup: $apnsToken");
+    }
+    
     if (token != null) {
       debugPrint("FCM Token: $token");
       // Save to SharedPreferences first so we have it ready

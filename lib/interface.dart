@@ -73,6 +73,9 @@ class _InterfacePageState extends State<InterfacePage>
     _checkFirstTime();
     _listenForCallKitEvents();
     
+    // Attempt silent sync late in the lifecycle to catch tokens that weren't ready at startup
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncCallingData());
+
     // Cold-Start Handoff: Check if we were launched by an 'Answer' action
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkColdStartCall());
   }
@@ -1933,53 +1936,40 @@ class _InterfacePageState extends State<InterfacePage>
 
   Future<void> _syncCallingData() async {
      try {
-       ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text('Syncing data...'), duration: Duration(seconds: 1)),
-       );
-       
-       String? token;
-       try {
-         token = await FirebaseMessaging.instance.getToken();
-       } catch (tokenError) {
-         debugPrint("FCM Token Error: $tokenError");
-       }
+       String? fcmToken;
+       String? apnsToken;
 
-       if (token == null && Platform.isIOS) {
-          debugPrint("⚠️ FCM Token is NULL on iOS. Check Xcode Capabilities.");
+       try {
+         if (Platform.isIOS) {
+            apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+         }
+         fcmToken = await FirebaseMessaging.instance.getToken();
+       } catch (tokenError) {
+         debugPrint("Sync Diagnostic Error: $tokenError");
        }
 
        await FirebaseFirestore.instance.collection('users').doc(widget.userId).set({
-         'fcmToken': token,
+         'fcmToken': fcmToken,
          'platform': Platform.isIOS ? 'ios' : 'android',
          'lastSync': FieldValue.serverTimestamp(),
+         'apnsTokenDebug': apnsToken,
        }, SetOptions(merge: true));
 
        if (mounted) {
-         if (token == null && Platform.isIOS) {
+         if (fcmToken == null && Platform.isIOS) {
+            String msg = "⚠️ Sync Issues: ";
+            if (apnsToken == null) msg += "Apple APNs missing. Check Provisioning.";
+            else msg += "Firebase failed APNs map.";
+            
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                backgroundColor: Colors.orange,
-                content: Text('⚠️ Sync Warning: Token is empty. Enable "Push Notifications" in Xcode.'),
-              ),
+              SnackBar(backgroundColor: Colors.orange, content: Text(msg)),
             );
-         } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                backgroundColor: Colors.green,
-                content: Text('✅ Data Synced! Your iOS device is now discoverable.'),
-              ),
-            );
+         } else if (fcmToken != null) {
+            debugPrint("✅ Sync Success for ${widget.userId}");
          }
        }
      } catch (e) {
-       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(
-             backgroundColor: Colors.red,
-             content: Text('❌ Sync Failed: $e'),
-           ),
-         );
-       }
+       debugPrint("❌ Sync Failed: $e");
      }
   }
 
