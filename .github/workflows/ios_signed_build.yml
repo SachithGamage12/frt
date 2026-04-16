@@ -20,16 +20,35 @@ jobs:
           PROVISION_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
+          set -e
           CERT_PATH=$RUNNER_TEMP/build_certificate.p12
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo "=== Decoding certificate ==="
           echo -n "$CERTIFICATE_BASE64" | base64 --decode -o $CERT_PATH
+          echo "Certificate file size: $(wc -c < $CERT_PATH) bytes"
+
+          echo "=== Setting up keychain ==="
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          echo "=== Importing certificate (if this fails, P12_PASSWORD is wrong) ==="
           security import $CERT_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          echo "✅ Certificate imported successfully"
+
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychains -d user -s $KEYCHAIN_PATH
           security default-keychain -s $KEYCHAIN_PATH
+
+          echo "=== Verifying identity is available ==="
+          IDENTITY_COUNT=$(security find-identity -v -p codesigning | grep -c "Apple Distribution" || true)
+          echo "Found $IDENTITY_COUNT Apple Distribution identity(ies)"
+          if [ "$IDENTITY_COUNT" -eq "0" ]; then
+            echo "❌ FATAL: No Apple Distribution identity found after import."
+            echo "   Check that P12_PASSWORD secret matches the password of your ios_distribution.p12 file."
+            exit 1
+          fi
 
           PP_PATH=$RUNNER_TEMP/temp.mobileprovision
           echo -n "$PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
