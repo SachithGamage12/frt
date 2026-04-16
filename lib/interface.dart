@@ -1,3 +1,4 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -1329,6 +1330,33 @@ class _InterfacePageState extends State<InterfacePage>
                 if (_isSharingLiveLocation)
                   _buildLiveStatusBar(),
                 
+                // Sync Device Button (Added for iOS Calling Reliability)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+                  child: InkWell(
+                    onTap: _syncCallingData,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.sync, color: Colors.greenAccent, size: 16),
+                          SizedBox(width: 8),
+                          Text(
+                            "Sync Calling Data",
+                            style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                
                 const SizedBox(height: 10),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -1902,6 +1930,45 @@ class _InterfacePageState extends State<InterfacePage>
     );
   }
 
+
+  Future<void> _syncCallingData() async {
+     try {
+       ScaffoldMessenger.of(context).showSnackBar(
+         const SnackBar(content: Text('Syncing data...'), duration: Duration(seconds: 1)),
+       );
+       
+       String? token;
+       try {
+         token = await FirebaseMessaging.instance.getToken();
+       } catch (tokenError) {
+         debugPrint("FCM Token Error: $tokenError");
+       }
+
+       await FirebaseFirestore.instance.collection('users').doc(widget.userId).set({
+         'fcmToken': token,
+         'platform': Platform.isIOS ? 'ios' : 'android',
+         'lastSync': FieldValue.serverTimestamp(),
+       }, SetOptions(merge: true));
+
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(
+             backgroundColor: Colors.green,
+             content: Text('✅ Data Synced! Your iOS device is now discoverable.'),
+           ),
+         );
+       }
+     } catch (e) {
+       if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(
+             backgroundColor: Colors.red,
+             content: Text('❌ Sync Failed: $e'),
+           ),
+         );
+       }
+     }
+  }
 
   void _checkLocationAccuracy_REDUNDANT() {} // Placeholder for removal target
 
