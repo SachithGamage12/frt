@@ -72,48 +72,57 @@ void main() async {
     _initializeFCM(); // Non-blocking
     
     // Check for cold start call BEFORE app initializes (Essential for Killed State)
-    final activeCalls = await FlutterCallkitIncoming.activeCalls();
-    if (activeCalls is List && activeCalls.isNotEmpty) {
-        final firstCall = activeCalls.first;
-        final extra = firstCall['extra'];
-        if (extra != null && extra['channelName'] != null) {
-             InitialCallState.targetChannel = extra['channelName'];
-             InitialCallState.targetCallerId = extra['callerId'];
-             InitialCallState.targetCallerName = extra['callerName'];
-             InitialCallState.hasPendingCall = true;
-             debugPrint("Captured Cold Start Call: ${extra['channelName']}");
-        }
+    try {
+      final activeCalls = await FlutterCallkitIncoming.activeCalls();
+      if (activeCalls is List && activeCalls.isNotEmpty) {
+          final firstCall = activeCalls.first;
+          if (firstCall is Map && firstCall['extra'] != null) {
+              final extra = firstCall['extra'] as Map;
+              if (extra['channelName'] != null) {
+                   InitialCallState.targetChannel = extra['channelName'];
+                   InitialCallState.targetCallerId = extra['callerId'];
+                   InitialCallState.targetCallerName = extra['callerName'];
+                   InitialCallState.hasPendingCall = true;
+                   debugPrint("Captured Cold Start Call: ${extra['channelName']}");
+              }
+          }
+      }
+    } catch (e) {
+      debugPrint("CallKit Cold Start Error (Suppressed): $e");
     }
     
     // Listen for events while app is running
     FlutterCallkitIncoming.onEvent.listen((event) {
-       if (event == null) return;
-       debugPrint("CallKit Global Event: ${event.event}");
-       
-       if (event.event == 'ACTION_CALL_ACCEPT') {
-          final extra = event.body['extra'];
-          if (extra != null && extra['channelName'] != null) {
-             InitialCallState.targetChannel = extra['channelName'];
-             InitialCallState.targetCallerId = extra['callerId'];
-             InitialCallState.targetCallerName = extra['callerName'];
-             InitialCallState.hasPendingCall = true;
-             debugPrint("Bufferized Pending Call: ${extra['channelName']}");
-             
-             // INSTANT-PUSH: If app is already active, jump to call immediately
-             if (navigatorKey.currentState != null) {
-                navigatorKey.currentState?.push(
-                  MaterialPageRoute(
-                    builder: (context) => CallPage(
-                      channelName: extra['channelName'],
-                      callerId: extra['callerId'] ?? 'unknown',
-                      calleeId: 'current_user', 
-                      isCaller: false,
-                    ),
-                  ),
-                );
+        try {
+          if (event == null || event.body == null) return;
+          debugPrint("CallKit Global Event: ${event.event}");
+          
+          if (event.event == 'ACTION_CALL_ACCEPT') {
+             final body = event.body as Map;
+             final extra = body['extra'] as Map?;
+             if (extra != null && extra['channelName'] != null) {
+                InitialCallState.targetChannel = extra['channelName'];
+                InitialCallState.targetCallerId = extra['callerId'];
+                InitialCallState.targetCallerName = extra['callerName'];
+                InitialCallState.hasPendingCall = true;
+                
+                if (navigatorKey.currentState != null) {
+                   navigatorKey.currentState?.push(
+                     MaterialPageRoute(
+                       builder: (context) => CallPage(
+                         channelName: extra['channelName']!,
+                         callerId: extra['callerId'] ?? 'unknown',
+                         calleeId: 'current_user', 
+                         isCaller: false,
+                       ),
+                     ),
+                   );
+                }
              }
           }
-       }
+        } catch (e) {
+          debugPrint("CallKit Event Error: $e");
+        }
     });
 
   } catch (e) {

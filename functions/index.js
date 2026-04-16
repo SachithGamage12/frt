@@ -46,6 +46,7 @@ exports.sendCallNotification = onDocumentCreated("calls/{userId}", async (event)
                 headers: {
                     'apns-priority': '10',
                     'apns-push-type': 'alert',
+                    'apns-topic': 'com.sachith.familytrack.ios',
                 },
             },
         };
