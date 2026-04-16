@@ -17,34 +17,39 @@ import GoogleMaps
 
         GMSServices.provideAPIKey("AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg")
         
-        // --- Added for Firebase Messaging ---
+        // --- Added for Firebase Messaging Native Handshake ---
         Messaging.messaging().delegate = self
+        
         if #available(iOS 10.0, *) {
-          UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
+          UNUserNotificationCenter.current().delegate = self
           let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
-          UNUserNotificationCenter.current().requestAuthorization(
-            options: authOptions,
-            completionHandler: { _, _ in }
-          )
+          UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { granted, error in
+              if let error = error {
+                  print("❌ Notification Auth Error: \(error)")
+              }
+              if granted {
+                  DispatchQueue.main.async {
+                      application.registerForRemoteNotifications()
+                  }
+              }
+          }
         } else {
-          let settings: UIUserNotificationSettings =
-            UIUserNotificationSettings(types: [.alert, .badge, .sound], categories: nil)
+          let settings: UIUserNotificationSettings = UIUserNotificationSettings(types: [.alert, .badge, .sound], categories: nil)
           application.registerUserNotificationSettings(settings)
+          application.registerForRemoteNotifications()
         }
-        application.registerForRemoteNotifications()
-        // -------------------------------------
+        // ---------------------------------------------------
 
         GeneratedPluginRegistrant.register(with: self)
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
 
-    // Capture the APNs token and pass it to Firebase (Essential for reliability)
     override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Messaging.messaging().apnsToken = deviceToken
         super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
     }
-
+    
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        print("✅ Firebase registration token: \(String(describing: fcmToken))")
+        print("✅ Registered with FCM Token: \(String(describing: fcmToken))")
     }
 }
