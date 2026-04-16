@@ -177,11 +177,14 @@
 					};
 					97C146ED1CF9000F007C117D = {
 						CreatedOnToolsVersion = 7.3.1;
-						LastSwiftMigration = 1100;
-					};
-					97C146ED1CF9000F007C117D = {
 						DevelopmentTeam = KMPA36RSLQ;
+						LastSwiftMigration = 1100;
 						ProvisioningStyle = Automatic;
+						SystemCapabilities = {
+							com.apple.Push = {
+								enabled = 1;
+							};
+						};
 					};
 					331C8080294A63A400263BE5 = {
 						DevelopmentTeam = KMPA36RSLQ;

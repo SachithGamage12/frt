@@ -144,6 +144,11 @@ Future<void> _initializeFCM() async {
       sound: true,
     );
 
+    // Give iOS a moment to finish delegate handshake
+    if (Platform.isIOS) {
+        await Future.delayed(const Duration(seconds: 2));
+    }
+
     // Get FCM token and immediately save it to Firestore
     String? token = await messaging.getToken();
     if (token != null) {
