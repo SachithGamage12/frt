@@ -1318,12 +1318,6 @@ class _InterfacePageState extends State<InterfacePage>
       ),
       body: Stack(
         children: [
-          Positioned(
-            top: 20,
-            left: 20,
-            right: 20,
-            child: _buildVoIPStatus(),
-          ),
           if (_isLoading)
             const Center(child: CircularProgressIndicator())
           else if (_userData == null)
@@ -1336,7 +1330,7 @@ class _InterfacePageState extends State<InterfacePage>
                   _buildLiveStatusBar(),
                 
                 const SizedBox(height: 10),
-                _buildVoIPStatus(),
+                if (Platform.isIOS) _buildVoIPStatus(),
                 const SizedBox(height: 10),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),

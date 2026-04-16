@@ -13,63 +13,66 @@ exports.sendCallNotification = onDocumentCreated("calls/{userId}", async (event)
     // Only send for 'ringing' status
     if (data.status !== 'ringing') return;
 
-    const payload = {
-        data: {
-            type: 'call',
-            callerId: data.callerId,
-            callerName: data.callerName,
-            callerAvatar: data.callerAvatar || '',
-            channelName: data.channelName,
-            priority: 'high',
-        }
+    const callPayload = {
+        type: 'call',
+        callerId: data.callerId || '',
+        callerName: data.callerName || 'Family Member',
+        callerAvatar: data.callerAvatar || '',
+        channelName: data.channelName || '',
+        priority: 'high',
     };
 
-    // 🍏 iOS VoIP Logic (Using PushKit)
-    if (data.platform === 'ios' && data.voipToken) {
-        console.log(`Sending VoIP Push to iOS user: ${event.params.userId}`);
-        const voipMessage = {
-            token: data.voipToken,
-            data: payload.data, // For Android fallback if they use voipToken
+    // 🍏 iOS: Use FCM with content-available for background wake-up
+    // Works with the .p8 Auth Key already in Firebase (no VoIP cert needed)
+    if (data.platform === 'ios' && data.fcmToken) {
+        console.log(`Sending FCM background call to iOS user: ${event.params.userId}`);
+        const iosMessage = {
+            token: data.fcmToken,
+            data: callPayload,
             apns: {
                 payload: {
                     aps: {
-                        'content-available': 1,
-                        priority: 10,
+                        'content-available': 1,  // Wake app in background
+                        'mutable-content': 1,
+                        sound: 'default',
+                        alert: {
+                            title: `📞 ${callPayload.callerName} is calling`,
+                            body: 'Tap to answer',
+                        },
                     },
-                    // Custom data for the Native AppDelegate to read
-                    custom: payload.data
+                    // Custom call data readable by Flutter
+                    callData: callPayload,
                 },
                 headers: {
                     'apns-priority': '10',
-                    'apns-push-type': 'voip', // REQUIRED FOR IOS CALLS
-                    'apns-topic': 'com.sachith.familytrack.ios.voip' // Exact Bundle ID + .voip
-                }
-            }
+                    'apns-push-type': 'alert',
+                },
+            },
         };
         try {
-            await admin.messaging().send(voipMessage);
-            console.log("✅ iOS VoIP Signal Sent");
+            await admin.messaging().send(iosMessage);
+            console.log("✅ iOS FCM Call Signal Sent");
         } catch (error) {
-            console.error("❌ iOS VoIP Error:", error);
+            console.error("❌ iOS FCM Error:", error);
         }
-    } 
-    
-    // 🤖 Android / Standard FCM Logic
-    if (data.fcmToken) {
-        console.log(`Sending Standard FCM to: ${event.params.userId}`);
-        const fcmMessage = {
+    }
+
+    // 🤖 Android: High-priority FCM data message
+    if (data.fcmToken && data.platform !== 'ios') {
+        console.log(`Sending FCM call to Android user: ${event.params.userId}`);
+        const androidMessage = {
             token: data.fcmToken,
-            data: payload.data,
+            data: callPayload,
             android: {
                 priority: 'high',
-                ttl: 0, // Instant
-            }
+                ttl: 0,
+            },
         };
         try {
-            await admin.messaging().send(fcmMessage);
-            console.log("✅ Standard FCM Signal Sent");
+            await admin.messaging().send(androidMessage);
+            console.log("✅ Android FCM Call Signal Sent");
         } catch (error) {
-            console.error("❌ FCM Error:", error);
+            console.error("❌ Android FCM Error:", error);
         }
     }
 });
