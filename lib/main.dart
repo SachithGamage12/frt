@@ -126,65 +126,81 @@ Future<void> _initializeFCM() async {
       sound: true,
     );
 
-    // Get and store the token
+    // Get FCM token and immediately save it to Firestore
     String? token = await messaging.getToken();
     if (token != null) {
       debugPrint("FCM Token: $token");
-    }
-
-    // VOIP BRIDGE: Listen for token and call actions from native iOS
-    if (Platform.isIOS) {
-      const channel = MethodChannel('com.frt.voip');
-      channel.setMethodCallHandler((call) async {
-        if (call.method == 'voipToken') {
-          final voipToken = call.arguments as String;
-          InitialCallState.voipToken = voipToken; // Save temporarily
-          final prefs = await SharedPreferences.getInstance();
-          final userId = prefs.getString('mobile');
-          if (userId != null) {
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(userId)
-                .update({
-                  'voipToken': voipToken, 
-                  'platform': 'ios',
-                  'lastActive': FieldValue.serverTimestamp(),
-                });
-            debugPrint("Synced VoIP Token to Firestore: $voipToken");
-          }
-        } else if (call.method == 'callAccepted' || call.method == 'answerAction') {
-          // Native system Answered the call
-          if (InitialCallState.targetChannel != null) {
-             InitialCallState.hasPendingCall = true;
-             if (navigatorKey.currentState != null) {
-                navigatorKey.currentState?.push(
-                  MaterialPageRoute(
-                    builder: (context) => CallPage(
-                      channelName: InitialCallState.targetChannel!,
-                      callerId: InitialCallState.targetCallerId ?? 'unknown',
-                      calleeId: 'current_user',
-                      isCaller: false,
-                    ),
-                  ),
-                );
-             }
-          }
-        } else if (call.method == 'endAction') {
-          FlutterRingtonePlayer().stop();
-          if (navigatorKey.currentState != null) {
-             navigatorKey.currentState?.pop();
-          }
+      // Save to SharedPreferences first so we have it ready
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('fcmToken', token);
+      // Try to sync to Firestore immediately if user is already logged in
+      final userId = prefs.getString('mobile');
+      if (userId != null && userId.isNotEmpty) {
+        try {
+          await FirebaseFirestore.instance.collection('users').doc(userId).update({
+            'fcmToken': token,
+            'platform': Platform.isIOS ? 'ios' : 'android',
+            'lastActive': FieldValue.serverTimestamp(),
+          });
+          debugPrint("✅ FCM Token synced to Firestore for user: $userId");
+        } catch (e) {
+          debugPrint("FCM token sync error (will retry on login): $e");
         }
-      });
+      }
     }
 
-    // Handle Foreground Notifications
+    // Handle foreground FCM messages - show callkit if it's a call
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint('Got a foreground signal: ${message.data}');
+      debugPrint('Foreground FCM: ${message.data}');
+      final data = message.data;
+      if (data['type'] == 'call' || data['channelName'] != null) {
+        _showIncomingCallUI(data);
+      }
     });
+
+    // Handle notification tap when app is in background (not killed)
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint('Notification tapped: ${message.data}');
+      final data = message.data;
+      if (data['channelName'] != null) {
+        InitialCallState.targetChannel = data['channelName'];
+        InitialCallState.targetCallerId = data['callerId'];
+        InitialCallState.targetCallerName = data['callerName'];
+        InitialCallState.hasPendingCall = true;
+      }
+    });
+
   } catch (e) {
     debugPrint("Error initializing FCM: $e");
   }
+}
+
+Future<void> _showIncomingCallUI(Map<String, dynamic> data) async {
+  final params = CallKitParams(
+    id: data['channelName'] ?? 'incoming_call_${DateTime.now().millisecondsSinceEpoch}',
+    nameCaller: data['callerName'] ?? 'Family Member',
+    appName: 'FRT',
+    handle: 'Incoming Voice Call',
+    avatar: data['callerAvatar'],
+    type: 0,
+    textAccept: 'ANSWER',
+    textDecline: 'DECLINE',
+    duration: 30000,
+    extra: data,
+    android: const AndroidParams(
+      isCustomNotification: true,
+      isShowLogo: true,
+      ringtonePath: 'system_ringtone_default',
+    ),
+    ios: const IOSParams(
+      iconName: 'AppIcon',
+      handleType: 'generic',
+      supportsVideo: false,
+      audioSessionMode: 'voiceChat',
+      audioSessionActive: true,
+    ),
+  );
+  await FlutterCallkitIncoming.showCallkitIncoming(params);
 }
 
 class MyApp extends StatelessWidget {
