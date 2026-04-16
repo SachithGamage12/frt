@@ -293,12 +293,11 @@ class _FRTAnimationPageState extends State<FRTAnimationPage> with SingleTickerPr
       // Store FCM and VoIP tokens (Unified Sync)
       try {
         String? token = await FirebaseMessaging.instance.getToken();
-        final updates = <String, dynamic>{'lastActive': FieldValue.serverTimestamp()};
+        final updates = <String, dynamic>{
+          'lastActive': FieldValue.serverTimestamp(),
+          'platform': Platform.isIOS ? 'ios' : 'android',
+        };
         if (token != null) updates['fcmToken'] = token;
-        if (InitialCallState.voipToken != null) {
-           updates['voipToken'] = InitialCallState.voipToken;
-           updates['platform'] = 'ios';
-        }
         await _firestore.collection('users').doc(mobile).update(updates);
       } catch (e) {
         print("Skipping token update: $e");
@@ -528,12 +527,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           // Store tokens (Unified Sync)
           try {
             String? token = await FirebaseMessaging.instance.getToken();
-            final updates = <String, dynamic>{'lastActive': FieldValue.serverTimestamp()};
+            final updates = <String, dynamic>{
+              'lastActive': FieldValue.serverTimestamp(),
+              'platform': Platform.isIOS ? 'ios' : 'android',
+            };
             if (token != null) updates['fcmToken'] = token;
-            if (InitialCallState.voipToken != null) {
-              updates['voipToken'] = InitialCallState.voipToken;
-              updates['platform'] = 'ios';
-            }
             await _firestore.collection('users').doc(_mobileController.text).update(updates);
           } catch (e) {
             print("Skipping token update: $e");
