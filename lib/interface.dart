@@ -1938,14 +1938,24 @@ class _InterfacePageState extends State<InterfacePage>
      try {
        String? fcmToken;
        String? apnsToken;
-
-       try {
-         if (Platform.isIOS) {
-            apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+       
+       // RETRY LOOP: Apple APNs can be slow on first launch
+       int retries = 5;
+       while (retries > 0 && (fcmToken == null || (Platform.isIOS && apnsToken == null))) {
+         try {
+           if (Platform.isIOS) {
+              apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+           }
+           fcmToken = await FirebaseMessaging.instance.getToken();
+         } catch (e) {
+           debugPrint("Token Attempt Failed: $e");
          }
-         fcmToken = await FirebaseMessaging.instance.getToken();
-       } catch (tokenError) {
-         debugPrint("Sync Diagnostic Error: $tokenError");
+         
+         if (fcmToken != null && (!Platform.isIOS || apnsToken != null)) break;
+         
+         debugPrint("Waiting for Apple Handshake... ($retries left)");
+         await Future.delayed(const Duration(seconds: 5));
+         retries--;
        }
 
        await FirebaseFirestore.instance.collection('users').doc(widget.userId).set({
@@ -1959,10 +1969,10 @@ class _InterfacePageState extends State<InterfacePage>
          if (fcmToken == null && Platform.isIOS) {
             String msg = "⚠️ Sync Issues: ";
             if (apnsToken == null) msg += "Apple APNs missing. Check Provisioning.";
-            else msg += "Firebase failed APNs map.";
+            else msg += "Firebase mapping failed.";
             
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(backgroundColor: Colors.orange, content: Text(msg)),
+              SnackBar(backgroundColor: Colors.orange, content: Text(msg), duration: const Duration(seconds: 4)),
             );
          } else if (fcmToken != null) {
             debugPrint("✅ Sync Success for ${widget.userId}");
