@@ -1944,6 +1944,10 @@ class _InterfacePageState extends State<InterfacePage>
          debugPrint("FCM Token Error: $tokenError");
        }
 
+       if (token == null && Platform.isIOS) {
+          debugPrint("⚠️ FCM Token is NULL on iOS. Check Xcode Capabilities.");
+       }
+
        await FirebaseFirestore.instance.collection('users').doc(widget.userId).set({
          'fcmToken': token,
          'platform': Platform.isIOS ? 'ios' : 'android',
@@ -1951,12 +1955,21 @@ class _InterfacePageState extends State<InterfacePage>
        }, SetOptions(merge: true));
 
        if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(
-             backgroundColor: Colors.green,
-             content: Text('✅ Data Synced! Your iOS device is now discoverable.'),
-           ),
-         );
+         if (token == null && Platform.isIOS) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                backgroundColor: Colors.orange,
+                content: Text('⚠️ Sync Warning: Token is empty. Enable "Push Notifications" in Xcode.'),
+              ),
+            );
+         } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                backgroundColor: Colors.green,
+                content: Text('✅ Data Synced! Your iOS device is now discoverable.'),
+              ),
+            );
+         }
        }
      } catch (e) {
        if (mounted) {
