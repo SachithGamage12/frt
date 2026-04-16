@@ -128,11 +128,43 @@ jobs:
       - name: Step 3 - Export IPA from Archive
         run: |
           mkdir -p build/ios/ipa
+
+          # Generate fresh ExportOptions.plist with dynamic profile UUID
+          cat > /tmp/ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>KMPA36RSLQ</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution: Sachith Gamage (KMPA36RSLQ)</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.sachith.familytrack.ios</key>
+              <string>FRT App Store Distribution</string>
+            </dict>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>compileBitcode</key>
+            <false/>
+            <key>thinning</key>
+            <string>&lt;none&gt;</string>
+          </dict>
+          </plist>
+          EOF
+
+          echo "Using Profile UUID: $PROFILE_UUID"
+
           xcodebuild \
             -exportArchive \
             -archivePath $RUNNER_TEMP/Runner.xcarchive \
             -exportPath build/ios/ipa \
-            -exportOptionsPlist ios/ExportOptions.plist \
+            -exportOptionsPlist /tmp/ExportOptions.plist \
             -allowProvisioningUpdates \
             -verbose
 
