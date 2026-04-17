@@ -89,7 +89,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app requires microphone access for Voice Calls with your contacts.</string>
 	<key>FirebaseAppDelegateProxyEnabled</key>
-	<false/>
+	<true/>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 	</array>

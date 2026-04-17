@@ -45,13 +45,12 @@ import GoogleMaps
     }
 
     override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        // Since we disabled swizzling, this is the ONLY way Firebase gets the token
-        Messaging.messaging().setAPNSToken(deviceToken, type: .prod)
+        // Swizzling is enabled, so we don't need manual mapping.
         super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
     }
     
     override func applicationDidBecomeActive(_ application: UIApplication) {
-        // Redundant check to ensure APNs is always registered
+        // Ensure APNs is always registered
         application.registerForRemoteNotifications()
     }
 }
