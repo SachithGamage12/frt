@@ -45,15 +45,13 @@ import GoogleMaps
     }
 
     override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        // Force the token type to .prod for TestFlight/App Store builds
+        // Since we disabled swizzling, this is the ONLY way Firebase gets the token
         Messaging.messaging().setAPNSToken(deviceToken, type: .prod)
         super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
     }
     
     override func applicationDidBecomeActive(_ application: UIApplication) {
-        // Trigger a re-registration whenever the app comes to foreground 
-        // to ensure we capture the token if the initial boot handshake failed.
-        print("🔄 App active: Requesting APNs token refresh...")
+        // Redundant check to ensure APNs is always registered
         application.registerForRemoteNotifications()
     }
 }
