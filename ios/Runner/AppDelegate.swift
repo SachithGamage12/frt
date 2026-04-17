@@ -71,7 +71,7 @@ import GoogleMaps
                   UserDefaults.standard.set(userId, forKey: "frt_user_id")
                   print("✅ v17: Saved User ID for Native Rescue: \(userId)")
                   if let currentToken = Messaging.messaging().fcmToken {
-                      self?.pushTokenToFirestore(fcmToken: currentToken, userId: userId)
+                      self.pushTokenToFirestore(fcmToken: currentToken, userId: userId)
                   }
                   result(true)
               } else {
