@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -1939,6 +1940,8 @@ class _InterfacePageState extends State<InterfacePage>
        String? fcmToken;
        String? apnsToken;
        
+       const platform = MethodChannel('com.frt.fcm/diagnostics');
+       
        // RETRY LOOP: Apple APNs can be slow on first launch
        int retries = 5;
        while (retries > 0 && (fcmToken == null || (Platform.isIOS && apnsToken == null))) {
@@ -1957,6 +1960,16 @@ class _InterfacePageState extends State<InterfacePage>
               apnsToken = await FirebaseMessaging.instance.getAPNSToken();
            }
            fcmToken = await FirebaseMessaging.instance.getToken();
+           
+           // DIAGNOSTIC FALLBACK: If Flutter thinks it's null, check the Native side
+           if (fcmToken == null && Platform.isIOS && apnsToken != null) {
+              debugPrint("FCM Null on Dart, checking Native Bridge...");
+              final String? nativeToken = await platform.invokeMethod('getNativeFCMToken');
+              if (nativeToken != null) {
+                fcmToken = nativeToken;
+                debugPrint("✅ Native Bridge recovered FCM token: $fcmToken");
+              }
+           }
          } catch (e) {
            debugPrint("Token Attempt Failed: $e");
          }

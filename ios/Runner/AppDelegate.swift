@@ -41,6 +41,22 @@ import GoogleMaps
         // ---------------------------------------------------
 
         GeneratedPluginRegistrant.register(with: self)
+        
+        // --- Diagnostic Method Channel for FCM ---
+        let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
+        let fcmChannel = FlutterMethodChannel(name: "com.frt.fcm/diagnostics",
+                                              binaryMessenger: controller.binaryMessenger)
+        fcmChannel.setMethodCallHandler({
+          (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
+          if call.method == "getNativeFCMToken" {
+              let token = Messaging.messaging().fcmToken
+              print("🔍 Native Diagnostic FCM Token Request: \(String(describing: token))")
+              result(token)
+          } else {
+            result(FlutterMethodNotImplemented)
+          }
+        })
+        
         return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
 
