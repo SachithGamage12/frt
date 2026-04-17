@@ -45,7 +45,8 @@ import GoogleMaps
     }
 
     override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        Messaging.messaging().apnsToken = deviceToken
+        // Force the token type to .prod for TestFlight/App Store builds
+        Messaging.messaging().setAPNSToken(deviceToken, type: .prod)
         super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
     }
     
