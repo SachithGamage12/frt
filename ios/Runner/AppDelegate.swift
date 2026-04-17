@@ -52,6 +52,18 @@ import GoogleMaps
               let token = Messaging.messaging().fcmToken
               print("🔍 Native Diagnostic FCM Token Request: \(String(describing: token))")
               result(token)
+          } else if call.method == "forceRetrieveFCMToken" {
+              // Forced retrieval using the absolute Sender ID
+              let senderID = "1060214465512"
+              Messaging.messaging().retrieveFCMToken(forSenderID: senderID) { (token, error) in
+                  if let error = error {
+                      print("❌ Forced FCM Retrieval Failed: \(error.localizedDescription)")
+                      result(nil)
+                  } else {
+                      print("✅ Forced FCM Retrieval Success: \(String(describing: token))")
+                      result(token)
+                  }
+              }
           } else {
             result(FlutterMethodNotImplemented)
           }
