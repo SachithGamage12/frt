@@ -77,6 +77,11 @@ class _InterfacePageState extends State<InterfacePage>
     // Attempt silent sync late in the lifecycle to catch tokens that weren't ready at startup
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncCallingData());
 
+    // v17: Native Identity Handshake for Rescue Path
+    if (Platform.isIOS) {
+      const MethodChannel('com.frt.fcm/diagnostics').invokeMethod('saveUserIdToNative', {'userId': widget.userId});
+    }
+
     // Cold-Start Handoff: Check if we were launched by an 'Answer' action
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkColdStartCall());
   }

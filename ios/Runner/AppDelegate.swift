@@ -2,6 +2,7 @@ import Flutter
 import UIKit
 import FirebaseCore
 import FirebaseMessaging
+import FirebaseFirestore
 import GoogleMaps
 
 @main
@@ -64,6 +65,18 @@ import GoogleMaps
                       result(token)
                   }
               }
+          } else if call.method == "saveUserIdToNative" {
+              if let args = call.arguments as? [String: Any],
+                 let userId = args["userId"] as? String {
+                  UserDefaults.standard.set(userId, forKey: "frt_user_id")
+                  print("✅ v17: Saved User ID for Native Rescue: \(userId)")
+                  if let currentToken = Messaging.messaging().fcmToken {
+                      self?.pushTokenToFirestore(fcmToken: currentToken, userId: userId)
+                  }
+                  result(true)
+              } else {
+                  result(false)
+              }
           } else {
             result(FlutterMethodNotImplemented)
           }
@@ -78,7 +91,32 @@ import GoogleMaps
     }
     
     override func applicationDidBecomeActive(_ application: UIApplication) {
-        // Ensure APNs is always registered
         application.registerForRemoteNotifications()
+    }
+}
+
+extension AppDelegate {
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        guard let fcmToken = fcmToken else { return }
+        print("🚀 v17 Native Handshake: FCM Token received: \(fcmToken)")
+        if let userId = UserDefaults.standard.string(forKey: "frt_user_id") {
+            pushTokenToFirestore(fcmToken: fcmToken, userId: userId)
+        }
+    }
+    
+    func pushTokenToFirestore(fcmToken: String, userId: String) {
+        print("📡 v17 Native Rescue: Pushing token to Firestore for \(userId)...")
+        let db = Firestore.firestore()
+        db.collection("users").document(userId).setData([
+            "fcmToken": fcmToken,
+            "platform": "ios",
+            "lastSync": FieldValue.serverTimestamp()
+        ], merge: true) { error in
+            if let error = error {
+                print("❌ v17 Native Rescue Error: \(error.localizedDescription)")
+            } else {
+                print("✅ v17 Native Rescue Success: Token synced via Swift Core")
+            }
+        }
     }
 }
