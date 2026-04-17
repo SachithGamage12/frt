@@ -49,7 +49,10 @@ import GoogleMaps
         super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
     }
     
-    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        print("✅ Registered with FCM Token: \(String(describing: fcmToken))")
+    override func applicationDidBecomeActive(_ application: UIApplication) {
+        // Trigger a re-registration whenever the app comes to foreground 
+        // to ensure we capture the token if the initial boot handshake failed.
+        print("🔄 App active: Requesting APNs token refresh...")
+        application.registerForRemoteNotifications()
     }
 }

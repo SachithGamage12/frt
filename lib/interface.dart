@@ -1942,6 +1942,16 @@ class _InterfacePageState extends State<InterfacePage>
        // RETRY LOOP: Apple APNs can be slow on first launch
        int retries = 5;
        while (retries > 0 && (fcmToken == null || (Platform.isIOS && apnsToken == null))) {
+         if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(
+               backgroundColor: Colors.blueGrey, 
+               content: Text("⏳ Attempting native handshake... (${6 - retries}/5)"), 
+               duration: const Duration(seconds: 2)
+             ),
+           );
+         }
+         
          try {
            if (Platform.isIOS) {
               apnsToken = await FirebaseMessaging.instance.getAPNSToken();
@@ -1953,7 +1963,6 @@ class _InterfacePageState extends State<InterfacePage>
          
          if (fcmToken != null && (!Platform.isIOS || apnsToken != null)) break;
          
-         debugPrint("Waiting for Apple Handshake... ($retries left)");
          await Future.delayed(const Duration(seconds: 5));
          retries--;
        }

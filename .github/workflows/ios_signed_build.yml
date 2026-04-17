@@ -195,6 +195,20 @@ jobs:
           path: build/ios/ipa/*.ipa
           if-no-files-found: error
 
+      - name: Upload to TestFlight (App Store Connect)
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+        run: |
+          echo "=== Starting Upload to TestFlight ==="
+          IPA_PATH=$(find build/ios/ipa -name "*.ipa" | head -1)
+          if [ -z "$IPA_PATH" ]; then
+            echo "❌ ERROR: No IPA found for upload!"
+            exit 1
+          fi
+          xcrun altool --upload-app --type ios --file "$IPA_PATH" --username "$APPLE_ID" --password "$APPLE_ID_PASSWORD"
+          echo "✅ Upload Successful (Wait ~15 mins for processing on Apple site)"
+
       - name: Clean up keychain
         if: always()
         run: |
