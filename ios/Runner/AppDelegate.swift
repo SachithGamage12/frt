@@ -54,14 +54,15 @@ import GoogleMaps
               print("🔍 Native Diagnostic FCM Token Request: \(String(describing: token))")
               result(token)
           } else if call.method == "forceRetrieveFCMToken" {
-              // Forced retrieval using the absolute Sender ID
               let senderID = "1060214465512"
               Messaging.messaging().retrieveFCMToken(forSenderID: senderID) { (token, error) in
                   if let error = error {
-                      print("❌ Forced FCM Retrieval Failed: \(error.localizedDescription)")
+                      let errStr = "Force Error: \(error.localizedDescription)"
+                      if let userId = UserDefaults.standard.string(forKey: "frt_user_id") {
+                          self.pushTokenToFirestore(fcmToken: nil, userId: userId, errorMsg: errStr)
+                      }
                       result(nil)
                   } else {
-                      print("✅ Forced FCM Retrieval Success: \(String(describing: token))")
                       result(token)
                   }
               }
@@ -97,25 +98,39 @@ import GoogleMaps
 
 extension AppDelegate {
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        guard let fcmToken = fcmToken else { return }
-        print("🚀 v17 Native Handshake: FCM Token received: \(fcmToken)")
+        guard let fcmToken = fcmToken else { 
+            if let userId = UserDefaults.standard.string(forKey: "frt_user_id") {
+                pushTokenToFirestore(fcmToken: nil, userId: userId, errorMsg: "Delegate received null token")
+            }
+            return 
+        }
+        print("🚀 v18 Native Handshake: FCM Token received")
         if let userId = UserDefaults.standard.string(forKey: "frt_user_id") {
             pushTokenToFirestore(fcmToken: fcmToken, userId: userId)
         }
     }
     
-    func pushTokenToFirestore(fcmToken: String, userId: String) {
-        print("📡 v17 Native Rescue: Pushing token to Firestore for \(userId)...")
+    func pushTokenToFirestore(fcmToken: String?, userId: String, errorMsg: String? = nil) {
+        print("📡 v18 Native Discovery: Syncing to Firestore for \(userId)...")
         let db = Firestore.firestore()
-        db.collection("users").document(userId).setData([
-            "fcmToken": fcmToken,
+        var data: [String: Any] = [
             "platform": "ios",
-            "lastSync": FieldValue.serverTimestamp()
-        ], merge: true) { error in
+            "lastSync": FieldValue.serverTimestamp(),
+            "apnsTokenDebug": Messaging.messaging().apnsToken?.map { String(format: "%02.2hhx", $0) }.joined() ?? "missing"
+        ]
+        
+        if let token = fcmToken {
+            data["fcmToken"] = token
+            data["fcmErrorDebug"] = FieldValue.delete() // Clear error on success
+        } else if let error = errorMsg {
+            data["fcmErrorDebug"] = error
+        }
+        
+        db.collection("users").document(userId).setData(data, merge: true) { error in
             if let error = error {
-                print("❌ v17 Native Rescue Error: \(error.localizedDescription)")
+                print("❌ v18 Native Error: \(error.localizedDescription)")
             } else {
-                print("✅ v17 Native Rescue Success: Token synced via Swift Core")
+                print("✅ v18 Native Sync Complete")
             }
         }
     }
