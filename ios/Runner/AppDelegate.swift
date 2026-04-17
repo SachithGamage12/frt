@@ -87,8 +87,20 @@ import GoogleMaps
     }
 
     override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        // Swizzling is enabled, so we don't need manual mapping.
+        // v19 MANUAL MAPPING: Explicitly hand the token to Firebase
+        Messaging.messaging().apnsToken = deviceToken
+        
+        // Force production type for TestFlight/Release builds
+        Messaging.messaging().setAPNSToken(deviceToken, type: .prod)
+        
         super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
+    }
+    
+    override func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        if let userId = UserDefaults.standard.string(forKey: "frt_user_id") {
+            pushTokenToFirestore(fcmToken: nil, userId: userId, errorMsg: "APNs Registration Failed: \(error.localizedDescription)")
+        }
+        super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
     }
     
     override func applicationDidBecomeActive(_ application: UIApplication) {
