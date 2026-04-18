@@ -62,9 +62,10 @@ class _InterfacePageState extends State<InterfacePage>
     _loadUserData();
     _checkSubscriptionStatus();
     WidgetsBinding.instance.addObserver(this);
-    if (Platform.isAndroid) {
-      _initForegroundTask();
-    }
+    
+    // v32: Execute on ALL platforms to prevent Unhandled Exception when starting service
+    _initForegroundTask();
+    
     _fetchUserData();
     _checkLocationPermission();
     _loadFamilyMembers();
@@ -586,11 +587,16 @@ class _InterfacePageState extends State<InterfacePage>
 
   Future<void> _startForegroundTask() async {
     if (_isSharingLiveLocation && _liveLocationSharingId != null) {
-      await FlutterForegroundTask.startService(
-        notificationTitle: 'Sharing Live Location',
-        notificationText: 'Your location is being shared with family members.',
-        callback: startLocationUpdates,
-      );
+      try {
+        await FlutterForegroundTask.startService(
+          notificationTitle: 'Sharing Live Location',
+          notificationText: 'Your location is being shared with family members.',
+          callback: startLocationUpdates,
+        );
+      } catch (e) {
+        debugPrint('⚠️ Foreground Task Start Error: $e');
+        // If it still fails, we swallow the error to prevent the native app from violently crashing.
+      }
     }
   }
 
