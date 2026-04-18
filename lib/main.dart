@@ -17,6 +17,19 @@ import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'call_page.dart';
+import 'dart:math' as math;
+
+String generateUuidV4() {
+  final random = math.Random();
+  final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+  bytes[6] = (bytes[6] & 0x0F) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3F) | 0x80; // variant
+  return '${_hex(bytes.sublist(0, 4))}-${_hex(bytes.sublist(4, 6))}-${_hex(bytes.sublist(6, 8))}-${_hex(bytes.sublist(8, 10))}-${_hex(bytes.sublist(10, 16))}';
+}
+
+String _hex(List<int> bytes) {
+  return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join('');
+}
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -31,8 +44,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     debugPrint("Background FCM: ${data['type']} / channel: ${data['channelName']}");
 
     if (data['type'] == 'call' || data['channelName'] != null) {
+      final callId = generateUuidV4();
       final params = CallKitParams(
-        id: data['channelName'] ?? 'call_${DateTime.now().millisecondsSinceEpoch}',
+        id: callId,
         nameCaller: data['callerName'] ?? 'Family Member',
         appName: 'FRT',
         handle: 'Incoming Voice Call',
@@ -133,6 +147,14 @@ void main() async {
                 }
                 navigateToCall();
              }
+          } else if (event.event == 'ACTION_CALL_DECLINE' || event.event == 'ACTION_CALL_ENDED' || event.event == 'ACTION_CALL_TIMEOUT') {
+             InitialCallState.hasPendingCall = false;
+             if (navigatorKey.currentState != null) {
+                // Return to normal app flow if call is dismissed
+                navigatorKey.currentState?.pushReplacement(
+                   MaterialPageRoute(builder: (context) => const FRTAnimationPage()),
+                );
+             }
           }
         } catch (e) {
           debugPrint("CallKit Event Error: $e");
@@ -227,8 +249,9 @@ Future<void> _initializeFCM() async {
 }
 
 Future<void> _showIncomingCallUI(Map<String, dynamic> data) async {
+  final callId = generateUuidV4();
   final params = CallKitParams(
-    id: data['channelName'] ?? 'incoming_call_${DateTime.now().millisecondsSinceEpoch}',
+    id: callId,
     nameCaller: data['callerName'] ?? 'Family Member',
     appName: 'FRT',
     handle: 'Incoming Voice Call',
@@ -266,15 +289,21 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      // v31: Direct bypass for active calls to prevent Splash conflict
+      // v31: Dummy wait screen to protect background GPU memory. Actual call UI loads ON ACCEPT EVENT.
       home: InitialCallState.hasPendingCall 
-          ? CallPage(
-              channelName: InitialCallState.targetChannel!,
-              callerId: InitialCallState.targetCallerId ?? 'unknown',
-              calleeId: 'current_user',
-              isCaller: false,
-            )
+          ? const StartupWaitingPage() 
           : const FRTAnimationPage(),
+    );
+  }
+}
+
+class StartupWaitingPage extends StatelessWidget {
+  const StartupWaitingPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Colors.black, // Extremely lightweight background page
     );
   }
 }

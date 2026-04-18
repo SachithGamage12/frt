@@ -22,6 +22,17 @@ import 'call_page.dart';
 import 'style_utils.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'globals.dart';
+import 'dart:math' as math;
+
+// v32: UUID generator for CallKit - iOS requires valid UUIDv4 or triggers SIGTRAP
+String generateUuidV4() {
+  final random = math.Random();
+  final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+  bytes[6] = (bytes[6] & 0x0F) | 0x40;
+  bytes[8] = (bytes[8] & 0x3F) | 0x80;
+  String _hex(List<int> b) => b.map((x) => x.toRadixString(16).padLeft(2, '0')).join('');
+  return '${_hex(bytes.sublist(0, 4))}-${_hex(bytes.sublist(4, 6))}-${_hex(bytes.sublist(6, 8))}-${_hex(bytes.sublist(8, 10))}-${_hex(bytes.sublist(10, 16))}';
+}
 
 class InterfacePage extends StatefulWidget {
   final String userId;
@@ -453,8 +464,9 @@ class _InterfacePageState extends State<InterfacePage>
   }
 
   Future<void> _showCallkitIncoming(Map<String, dynamic> callData) async {
+    final callId = generateUuidV4(); // v32: Must be valid UUID or iOS SIGTRAP crash
     final params = CallKitParams(
-      id: callData['channelName'] ?? widget.userId,
+      id: callId,
       nameCaller: callData['callerName'] ?? 'Family Member',
       appName: 'FRT',
       handle: 'Incoming Voice Call',
@@ -2110,9 +2122,9 @@ void _startBackgroundCallMonitor(String userId) {
         if (snapshot.exists) {
           final data = snapshot.data();
           if (data != null) {
-            final uuid = 'call_${DateTime.now().millisecondsSinceEpoch}';
+            final callId = generateUuidV4(); // v32: Must be valid UUID or iOS SIGTRAP crash
             final params = CallKitParams(
-              id: uuid,
+              id: callId,
               nameCaller: data['callerName'] ?? 'Family Tracking',
               appName: 'FRT',
               avatar: data['profilePicture'],
