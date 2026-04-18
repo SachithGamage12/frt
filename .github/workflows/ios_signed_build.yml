@@ -52,8 +52,9 @@ jobs:
 
           PP_PATH=$RUNNER_TEMP/temp.mobileprovision
           echo -n "$PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
-          UUID=$(security cms -D -i $PP_PATH | grep -A 1 "UUID" | tail -1 | sed 's/.*<string>//;s/<\/string>.*//')
-          NAME=$(security cms -D -i $PP_PATH | grep -A 1 "Name" | tail -1 | sed 's/.*<string>//;s/<\/string>.*//')
+          security cms -D -i $PP_PATH > /tmp/pp.plist
+          UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /tmp/pp.plist)
+          NAME=$(/usr/libexec/PlistBuddy -c "Print Name" /tmp/pp.plist)
           echo "PROFILE_UUID=$UUID" >> $GITHUB_ENV
           echo "PROFILE_NAME=$NAME" >> $GITHUB_ENV
           echo "Profile UUID: $UUID"
@@ -145,11 +146,11 @@ jobs:
             <key>signingStyle</key>
             <string>manual</string>
             <key>signingCertificate</key>
-            <string>Apple Distribution: Sachith Gamage (KMPA36RSLQ)</string>
+            <string>Apple Distribution</string>
             <key>provisioningProfiles</key>
             <dict>
               <key>com.sachith.familytrack.ios</key>
-              <string>$PROFILE_NAME</string>
+              <string>$PROFILE_UUID</string>
             </dict>
             <key>uploadSymbols</key>
             <true/>
