@@ -53,6 +53,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
           supportsVideo: false,
           audioSessionMode: 'voiceChat',
           audioSessionActive: true,
+          configureAudioSession: false,
         ),
       );
       await FlutterCallkitIncoming.showCallkitIncoming(params);
@@ -248,6 +249,7 @@ Future<void> _showIncomingCallUI(Map<String, dynamic> data) async {
       supportsVideo: false,
       audioSessionMode: 'voiceChat',
       audioSessionActive: true,
+      configureAudioSession: false,
     ),
   );
   await FlutterCallkitIncoming.showCallkitIncoming(params);

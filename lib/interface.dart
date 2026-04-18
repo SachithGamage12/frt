@@ -481,6 +481,7 @@ class _InterfacePageState extends State<InterfacePage>
         supportsVideo: false,
         audioSessionMode: 'voiceChat',
         audioSessionActive: true,
+        configureAudioSession: false,
       ),
     );
     await FlutterCallkitIncoming.showCallkitIncoming(params);
@@ -2130,6 +2131,7 @@ void _startBackgroundCallMonitor(String userId) {
                 supportsVideo: false,
                 audioSessionMode: 'default',
                 audioSessionActive: true,
+                configureAudioSession: false,
               ),
               extra: {
                 'channelName': data['channelName'],
