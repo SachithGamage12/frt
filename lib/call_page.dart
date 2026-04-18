@@ -41,10 +41,16 @@ class _CallPageState extends State<CallPage> {
     // Stop all system ringtones immediately to clear audio hardware
     FlutterRingtonePlayer().stop();
 
+    // v30: Delaying initialization slightly for iOS CallKit stability
+    // This gives the OS time to switch the audio session context from ringing to voice.
     _initEnginePreWarm().then((_) {
       if (mounted) {
-        _joinCallSession();
-        _listenToCallStatus();
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (mounted) {
+            _joinCallSession();
+            _listenToCallStatus();
+          }
+        });
       }
     });
   }

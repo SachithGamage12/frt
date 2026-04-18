@@ -43,8 +43,16 @@ import GoogleMaps
 
         GeneratedPluginRegistrant.register(with: self)
         
-        // --- Diagnostic Method Channel for FCM ---
-        let controller : FlutterViewController = window?.rootViewController as! FlutterViewController
+        // --- v30: Secure Controller Access for Background Stability ---
+        // Replacing unsafe 'as!' forced cast to prevent crashes during background/VoIP launches
+        if let controller = window?.rootViewController as? FlutterViewController {
+            setupMethodChannels(controller: controller)
+        }
+        
+        return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    }
+
+    private func setupMethodChannels(controller: FlutterViewController) {
         let fcmChannel = FlutterMethodChannel(name: "com.frt.fcm/diagnostics",
                                               binaryMessenger: controller.binaryMessenger)
         fcmChannel.setMethodCallHandler({
@@ -58,9 +66,8 @@ import GoogleMaps
               Messaging.messaging().retrieveFCMToken(forSenderID: senderID) { (token, error) in
                   if let error = error {
                       let errStr = "Force Error: \(error.localizedDescription)"
-                      if let userId = UserDefaults.standard.string(forKey: "frt_user_id") {
-                          self.pushTokenToFirestore(fcmToken: nil, userId: userId, errorMsg: errStr)
-                      }
+                      // v30: Native Firestore sync disabled to prevent initialization conflicts (IllegalStateException)
+                      print("❌ Native token retrieval fail: \(errStr)")
                       result(nil)
                   } else {
                       result(token)
@@ -70,10 +77,7 @@ import GoogleMaps
               if let args = call.arguments as? [String: Any],
                  let userId = args["userId"] as? String {
                   UserDefaults.standard.set(userId, forKey: "frt_user_id")
-                  print("✅ v17: Saved User ID for Native Rescue: \(userId)")
-                  if let currentToken = Messaging.messaging().fcmToken {
-                      self.pushTokenToFirestore(fcmToken: currentToken, userId: userId)
-                  }
+                  print("✅ v30: Saved User ID for Native Context: \(userId)")
                   result(true)
               } else {
                   result(false)
@@ -82,19 +86,14 @@ import GoogleMaps
             result(FlutterMethodNotImplemented)
           }
         })
-        
-        return super.application(application, didFinishLaunchingWithOptions: launchOptions)
     }
 
     override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        // v24: Conflict Resolved - Relying on swizzling since Proxy is Enabled (True) in Info.plist
         super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
     }
 
     override func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        if let userId = UserDefaults.standard.string(forKey: "frt_user_id") {
-            pushTokenToFirestore(fcmToken: nil, userId: userId, errorMsg: "APNs Fail: \(error.localizedDescription)")
-        }
+        print("❌ APNs Registration Fail: \(error.localizedDescription)")
         super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
     }
 
@@ -105,43 +104,11 @@ import GoogleMaps
 
 extension AppDelegate {
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        let userId = UserDefaults.standard.string(forKey: "frt_user_id")
-        
         if let token = fcmToken {
-            print("🚀 v21 Native Handshake: Success")
-            if let uid = userId {
-                pushTokenToFirestore(fcmToken: token, userId: uid)
-            }
+            print("🚀 v30 Native Handshake Success: \(token.prefix(8))...")
         } else {
-            print("❌ v21 Native Handshake: Null Token")
-            if let uid = userId {
-                pushTokenToFirestore(fcmToken: nil, userId: uid, errorMsg: "Firebase returned null token")
-            }
+            print("❌ v30 Native Handshake: Null Token")
         }
-    }
-    
-    func pushTokenToFirestore(fcmToken: String?, userId: String, errorMsg: String? = nil) {
-        print("📡 v21 Native Discovery: Syncing to Firestore for \(userId)...")
-        let db = Firestore.firestore()
-        var data: [String: Any] = [
-            "platform": "ios",
-            "lastSync": FieldValue.serverTimestamp(),
-            "apnsTokenDebug": Messaging.messaging().apnsToken?.map { String(format: "%02.2hhx", $0) }.joined() ?? "missing"
-        ]
-        
-        if let token = fcmToken {
-            data["fcmToken"] = token
-            data["fcmErrorDebug"] = FieldValue.delete() // Clear error on success
-        } else if let error = errorMsg {
-            data["fcmErrorDebug"] = error
-        }
-        
-        db.collection("users").document(userId).setData(data, merge: true) { error in
-            if let error = error {
-                print("❌ v21 Native Error: \(error.localizedDescription)")
-            } else {
-                print("✅ v21 Native Sync Complete")
-            }
-        }
+        // v30: Skipping native Firestore sync to resolve FIRIllegalStateException (Firestore already started in Flutter)
     }
 }

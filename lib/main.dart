@@ -93,7 +93,7 @@ void main() async {
       debugPrint("CallKit Cold Start Error (Suppressed): $e");
     }
     
-    // Listen for events while app is running
+    // v30: Dedicated listener for CallKit events to handle accepted calls reliably
     FlutterCallkitIncoming.onEvent.listen((event) {
         try {
           if (event == null || event.body == null) return;
@@ -108,18 +108,26 @@ void main() async {
                 InitialCallState.targetCallerName = extra['callerName'];
                 InitialCallState.hasPendingCall = true;
                 
-                if (navigatorKey.currentState != null) {
-                   navigatorKey.currentState?.push(
-                     MaterialPageRoute(
-                       builder: (context) => CallPage(
-                         channelName: extra['channelName']!,
-                         callerId: extra['callerId'] ?? 'unknown',
-                         calleeId: 'current_user', 
-                         isCaller: false,
+                // v30: Enhanced navigation - check navigatorKey and retry if needed
+                void navigateToCall() {
+                  if (navigatorKey.currentState != null) {
+                     navigatorKey.currentState?.push(
+                       MaterialPageRoute(
+                         builder: (context) => CallPage(
+                           channelName: extra['channelName']!,
+                           callerId: extra['callerId'] ?? 'unknown',
+                           calleeId: 'current_user', 
+                           isCaller: false,
+                         ),
                        ),
-                     ),
-                   );
+                     );
+                  } else {
+                    // If navigator isn't ready yet (e.g. app resuming), wait and retry
+                    debugPrint("⚠️ Navigator not ready, retrying navigation in 1s...");
+                    Future.delayed(const Duration(milliseconds: 1000), navigateToCall);
+                  }
                 }
+                navigateToCall();
              }
           }
         } catch (e) {
@@ -128,7 +136,7 @@ void main() async {
     });
 
   } catch (e) {
-    print("Firebase initialization error: $e");
+    debugPrint("Firebase initialization error: $e");
   }
   runApp(const MyApp());
 }
