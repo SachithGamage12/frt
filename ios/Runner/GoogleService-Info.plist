@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyBWRGXCiqYgZWCuxwlnosDjtuHZAC7SZjg</string>
+	<string>AIzaSyCmtV4tRTpCCgFZIVxGsW2lLiExZsTIOR4</string>
 	<key>GCM_SENDER_ID</key>
 	<string>1060214465512</string>
 	<key>PLIST_VERSION</key>
@@ -26,5 +26,7 @@
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
 	<string>1:1060214465512:ios:377eddb6c315792a43ba5d</string>
+	<key>DATABASE_URL</key>
+	<string>https://frtapp-ff79b-default-rtdb.asia-southeast1.firebasedatabase.app</string>
 </dict>
 </plist>

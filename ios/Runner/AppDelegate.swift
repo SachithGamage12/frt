@@ -87,8 +87,7 @@ import GoogleMaps
     }
 
     override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        // v21: Global Sync - Restore standard registration flow
-        Messaging.messaging().apnsToken = deviceToken
+        // v24: Conflict Resolved - Relying on swizzling since Proxy is Enabled (True) in Info.plist
         super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
     }
 

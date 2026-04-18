@@ -88,6 +88,8 @@
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app requires microphone access for Voice Calls with your contacts.</string>
+	<key>FirebaseMessagingAutoInitEnabled</key>
+	<true/>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<true/>
 	<key>LSApplicationQueriesSchemes</key>

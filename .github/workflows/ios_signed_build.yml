@@ -53,8 +53,11 @@ jobs:
           PP_PATH=$RUNNER_TEMP/temp.mobileprovision
           echo -n "$PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
           UUID=$(security cms -D -i $PP_PATH | grep -A 1 "UUID" | tail -1 | sed 's/.*<string>//;s/<\/string>.*//')
+          NAME=$(security cms -D -i $PP_PATH | grep -A 1 "Name" | tail -1 | sed 's/.*<string>//;s/<\/string>.*//')
           echo "PROFILE_UUID=$UUID" >> $GITHUB_ENV
+          echo "PROFILE_NAME=$NAME" >> $GITHUB_ENV
           echo "Profile UUID: $UUID"
+          echo "Profile Name: $NAME"
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
 
@@ -118,8 +121,8 @@ jobs:
             -resultBundlePath $RUNNER_TEMP/ResultBundle \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution: Sachith Gamage (KMPA36RSLQ)" \
-            PROVISIONING_PROFILE="$PROFILE_UUID" \
             DEVELOPMENT_TEAM=KMPA36RSLQ \
+            PROVISIONING_PROFILE=$PROFILE_UUID \
             archive 2>&1 | tee $RUNNER_TEMP/xcodebuild.log
           echo ""
           echo "=== KEY ERRORS FROM BUILD ==="
@@ -146,7 +149,7 @@ jobs:
             <key>provisioningProfiles</key>
             <dict>
               <key>com.sachith.familytrack.ios</key>
-              <string>FRT App Store Distribution</string>
+              <string>$PROFILE_NAME</string>
             </dict>
             <key>uploadSymbols</key>
             <true/>
