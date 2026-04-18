@@ -87,22 +87,18 @@ import GoogleMaps
     }
 
     override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        // v19 MANUAL MAPPING: Explicitly hand the token to Firebase
+        // v21: Global Sync - Restore standard registration flow
         Messaging.messaging().apnsToken = deviceToken
-        
-        // Force production type for TestFlight/Release builds
-        Messaging.messaging().setAPNSToken(deviceToken, type: .prod)
-        
         super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
     }
-    
+
     override func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         if let userId = UserDefaults.standard.string(forKey: "frt_user_id") {
-            pushTokenToFirestore(fcmToken: nil, userId: userId, errorMsg: "APNs Registration Failed: \(error.localizedDescription)")
+            pushTokenToFirestore(fcmToken: nil, userId: userId, errorMsg: "APNs Fail: \(error.localizedDescription)")
         }
         super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
     }
-    
+
     override func applicationDidBecomeActive(_ application: UIApplication) {
         application.registerForRemoteNotifications()
     }
@@ -110,20 +106,23 @@ import GoogleMaps
 
 extension AppDelegate {
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        guard let fcmToken = fcmToken else { 
-            if let userId = UserDefaults.standard.string(forKey: "frt_user_id") {
-                pushTokenToFirestore(fcmToken: nil, userId: userId, errorMsg: "Delegate received null token")
+        let userId = UserDefaults.standard.string(forKey: "frt_user_id")
+        
+        if let token = fcmToken {
+            print("🚀 v21 Native Handshake: Success")
+            if let uid = userId {
+                pushTokenToFirestore(fcmToken: token, userId: uid)
             }
-            return 
-        }
-        print("🚀 v18 Native Handshake: FCM Token received")
-        if let userId = UserDefaults.standard.string(forKey: "frt_user_id") {
-            pushTokenToFirestore(fcmToken: fcmToken, userId: userId)
+        } else {
+            print("❌ v21 Native Handshake: Null Token")
+            if let uid = userId {
+                pushTokenToFirestore(fcmToken: nil, userId: uid, errorMsg: "Firebase returned null token")
+            }
         }
     }
     
     func pushTokenToFirestore(fcmToken: String?, userId: String, errorMsg: String? = nil) {
-        print("📡 v18 Native Discovery: Syncing to Firestore for \(userId)...")
+        print("📡 v21 Native Discovery: Syncing to Firestore for \(userId)...")
         let db = Firestore.firestore()
         var data: [String: Any] = [
             "platform": "ios",
@@ -140,9 +139,9 @@ extension AppDelegate {
         
         db.collection("users").document(userId).setData(data, merge: true) { error in
             if let error = error {
-                print("❌ v18 Native Error: \(error.localizedDescription)")
+                print("❌ v21 Native Error: \(error.localizedDescription)")
             } else {
-                print("✅ v18 Native Sync Complete")
+                print("✅ v21 Native Sync Complete")
             }
         }
     }
