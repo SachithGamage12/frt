@@ -69,7 +69,9 @@ void main() async {
   try {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    // Removed _initializeFCM() from here to prevent early-boot race conditions on iOS
+    
+    // v22: Restoring the missing initialization link. This is mandatory for iOS FCM permissions.
+    _initializeFCM();
     
     // Check for cold start call BEFORE app initializes (Essential for Killed State)
     try {
