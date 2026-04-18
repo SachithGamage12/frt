@@ -67,7 +67,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await Firebase.initializeApp();
+    // v31: Idempotent initialization check to prevent settings conflict on iOS
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp();
+    }
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     
     // v22: Restoring the missing initialization link. This is mandatory for iOS FCM permissions.
@@ -175,19 +178,24 @@ Future<void> _initializeFCM() async {
       // Save to SharedPreferences first so we have it ready
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('fcmToken', token);
-      // Try to sync to Firestore immediately if user is already logged in
-      final userId = prefs.getString('mobile');
-      if (userId != null && userId.isNotEmpty) {
-        try {
-          await FirebaseFirestore.instance.collection('users').doc(userId).update({
-            'fcmToken': token,
-            'platform': Platform.isIOS ? 'ios' : 'android',
-            'lastActive': FieldValue.serverTimestamp(),
-          });
-          debugPrint("✅ FCM Token synced to Firestore for user: $userId");
-        } catch (e) {
-          debugPrint("FCM token sync error (will retry on login): $e");
+      
+      // v31: ONLY sync to Firestore if we AREN'T in the middle of a critical call launch
+      if (!InitialCallState.hasPendingCall) {
+        final userId = prefs.getString('mobile');
+        if (userId != null && userId.isNotEmpty) {
+          try {
+            await FirebaseFirestore.instance.collection('users').doc(userId).update({
+              'fcmToken': token,
+              'platform': Platform.isIOS ? 'ios' : 'android',
+              'lastActive': FieldValue.serverTimestamp(),
+            });
+            debugPrint("✅ FCM Token synced to Firestore for user: $userId");
+          } catch (e) {
+            debugPrint("FCM token sync error (will retry on login/auto-login): $e");
+          }
         }
+      } else {
+        debugPrint("⏳ Deferring FCM token sync due to active call...");
       }
     }
 
@@ -256,7 +264,15 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const FRTAnimationPage(),
+      // v31: Direct bypass for active calls to prevent Splash conflict
+      home: InitialCallState.hasPendingCall 
+          ? CallPage(
+              channelName: InitialCallState.targetChannel!,
+              callerId: InitialCallState.targetCallerId ?? 'unknown',
+              calleeId: 'current_user',
+              isCaller: false,
+            )
+          : const FRTAnimationPage(),
     );
   }
 }

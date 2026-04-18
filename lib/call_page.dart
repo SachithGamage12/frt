@@ -38,8 +38,12 @@ class _CallPageState extends State<CallPage> {
   @override
   void initState() {
     super.initState();
-    // Stop all system ringtones immediately to clear audio hardware
-    FlutterRingtonePlayer().stop();
+    // v31: Force stop any lingering ringtone immediately
+    try {
+      FlutterRingtonePlayer().stop();
+    } catch (e) {
+      debugPrint("Audio Guard Error: $e");
+    }
 
     // v30: Delaying initialization slightly for iOS CallKit stability
     // This gives the OS time to switch the audio session context from ringing to voice.
