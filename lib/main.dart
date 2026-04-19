@@ -150,8 +150,22 @@ void main() async {
              }
           } else if (event.event == 'ACTION_CALL_DECLINE' || event.event == 'ACTION_CALL_ENDED' || event.event == 'ACTION_CALL_TIMEOUT') {
              InitialCallState.hasPendingCall = false;
+             // v24: Delete Firestore call doc so CALLER side also knows call was declined/ended
+             SharedPreferences.getInstance().then((prefs) async {
+               try {
+                 final userId = prefs.getString('mobile');
+                 if (userId != null) {
+                   await FirebaseFirestore.instance.collection('calls').doc(userId).delete();
+                   debugPrint("✅ Call doc cleaned up on decline for $userId");
+                 }
+               } catch (e) { debugPrint("Decline Firestore cleanup error: $e"); }
+             });
+
+             // Also end any existing overlay if app was open with minimized call
+             CallManager.instance.removeOverlay();
+             CallManager.instance.clear();
+
              if (navigatorKey.currentState != null) {
-                // Return to normal app flow if call is dismissed
                 navigatorKey.currentState?.pushReplacement(
                    MaterialPageRoute(builder: (context) => const FRTAnimationPage()),
                 );

@@ -288,8 +288,8 @@ class _LocationViewPageState extends State<LocationViewPage> {
       });
       _updateCamera(newPosition);
 
-      // v22: Only add to path if moved >= 10 meters (prevents phantom lines from phone tilt/GPS flicker)
-      if (distance >= 10 || _rawPoints.isEmpty) {
+      // v24: 2m threshold — detailed walking path, filters GPS flicker
+      if (distance >= 2 || _rawPoints.isEmpty) {
         setState(() {
           _rawPoints.add(newPosition);
           _pathPoints.add(newPosition);
