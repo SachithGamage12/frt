@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -270,15 +271,39 @@ class _UserDetailsPageState extends State<UserDetailsPage> with SingleTickerProv
                                   value: widget.userData['promoCode'],
                                   subtitle: widget.userData['isPromoCodeUsed'] == true 
                                       ? 'Status: Used' 
-                                      : 'Status: Available',
+                                      : 'Status: Available • Tap copy to share',
                                   trailing: IconButton(
                                     icon: const Icon(Icons.copy, color: AppColors.primary, size: 20),
                                     onPressed: () {
-                                      // Note: In a real app, use Clipboard.setData
+                                      Clipboard.setData(ClipboardData(text: widget.userData['promoCode']));
                                       ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Code copied to clipboard')),
+                                        const SnackBar(content: Text('✅ Code copied to clipboard!')),
                                       );
                                     },
+                                  ),
+                                ),
+                              if (widget.userData['promoCode'] != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 10, bottom: 4, left: 4, right: 4),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                                    ),
+                                    child: const Row(
+                                      children: [
+                                        Icon(Icons.info_outline, color: AppColors.primary, size: 18),
+                                        SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            'Use this Connection Code to add a FREE 1-month subscription to another account on FRT App.',
+                                            style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.5),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               const SizedBox(height: 30),

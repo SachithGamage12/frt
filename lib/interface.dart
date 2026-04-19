@@ -1947,24 +1947,13 @@ class _InterfacePageState extends State<InterfacePage>
            debugPrint("Android FCM Token Error: $e");
          }
        } else {
-         // iOS: RETRY LOOP - Apple APNs can be slow on first launch
+         // iOS: RETRY LOOP - Apple APNs can be slow on first launch (silent, no UI)
          int retries = 5;
          while (retries > 0 && (fcmToken == null || apnsToken == null)) {
-           if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(
-               SnackBar(
-                 backgroundColor: Colors.blueGrey, 
-                 content: Text("⏳ Attempting native handshake... (${6 - retries}/5)"), 
-                 duration: const Duration(seconds: 2)
-               ),
-             );
-           }
-           
            try {
              apnsToken = await FirebaseMessaging.instance.getAPNSToken();
              fcmToken = await FirebaseMessaging.instance.getToken();
              
-             // DIAGNOSTIC FALLBACK: If Flutter thinks it's null, check the Native side
              if (fcmToken == null && apnsToken != null) {
                debugPrint("FCM Null on Dart, checking Native Bridge...");
                final String? nativeToken = await platform.invokeMethod('getNativeFCMToken');
@@ -1978,7 +1967,6 @@ class _InterfacePageState extends State<InterfacePage>
            }
            
            if (fcmToken != null && apnsToken != null) break;
-           
            await Future.delayed(const Duration(seconds: 5));
            retries--;
          }
@@ -1991,19 +1979,7 @@ class _InterfacePageState extends State<InterfacePage>
          'apnsTokenDebug': apnsToken,
        }, SetOptions(merge: true));
 
-       if (mounted) {
-         if (fcmToken == null && Platform.isIOS) {
-            String msg = "⚠️ Sync Issues: ";
-            if (apnsToken == null) msg += "Apple APNs missing. Check Provisioning.";
-            else msg += "Firebase mapping failed.";
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(backgroundColor: Colors.orange, content: Text(msg), duration: const Duration(seconds: 4)),
-            );
-         } else if (fcmToken != null) {
-            debugPrint("✅ Sync Success for ${widget.userId}");
-         }
-       }
+       debugPrint(fcmToken != null ? "✅ Sync Success for ${widget.userId}" : "⚠️ FCM token still null after retries");
      } catch (e) {
        debugPrint("❌ Sync Failed: $e");
      }

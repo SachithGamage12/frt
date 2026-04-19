@@ -397,10 +397,33 @@ class _PaymentPageState extends State<PaymentPage> {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
       ),
       child: Column(
         children: [
-          const Text("Activate with Connection Code", style: TextStyle(color: Colors.white70)),
+          const Text("Activate with Connection Code", style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          // Info banner about the promo code benefit
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.star_border, color: AppColors.primary, size: 16),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Once you pay LKR 350, a Connection Code will appear in your Profile page. Share it to give another account 1 FREE month on FRT App!',
+                    style: TextStyle(color: Colors.white60, fontSize: 11, height: 1.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 15),
           TextField(
             controller: _promoCodeController,
