@@ -840,7 +840,7 @@ class _InterfacePageState extends State<InterfacePage>
        _positionStream = Geolocator.getPositionStream(
         locationSettings: AppleSettings(
           accuracy: LocationAccuracy.bestForNavigation,
-          distanceFilter: 0,
+          distanceFilter: 10, // v22: 10m filter prevents phantom lines from phone tilt/GPS flicker
           pauseLocationUpdatesAutomatically: false,
           showBackgroundLocationIndicator: true,
           allowBackgroundLocationUpdates: true,
@@ -1357,33 +1357,6 @@ class _InterfacePageState extends State<InterfacePage>
                 // Active Sharing Status Bar
                 if (_isSharingLiveLocation)
                   _buildLiveStatusBar(),
-                
-                // Sync Device Button (Added for iOS Calling Reliability)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
-                  child: InkWell(
-                    onTap: _syncCallingData,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.sync, color: Colors.greenAccent, size: 16),
-                          SizedBox(width: 8),
-                          Text(
-                            "Sync Calling Data",
-                            style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
                 
                 const SizedBox(height: 10),
                 const Padding(
@@ -1966,42 +1939,49 @@ class _InterfacePageState extends State<InterfacePage>
        
        const platform = MethodChannel('com.frt.fcm/diagnostics');
        
-       // RETRY LOOP: Apple APNs can be slow on first launch
-       int retries = 5;
-       while (retries > 0 && (fcmToken == null || (Platform.isIOS && apnsToken == null))) {
-         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(
-               backgroundColor: Colors.blueGrey, 
-               content: Text("⏳ Attempting native handshake... (${6 - retries}/5)"), 
-               duration: const Duration(seconds: 2)
-             ),
-           );
-         }
-         
+       // Android: FCM token is always available immediately - no retry needed
+       if (Platform.isAndroid) {
          try {
-           if (Platform.isIOS) {
-              apnsToken = await FirebaseMessaging.instance.getAPNSToken();
-           }
            fcmToken = await FirebaseMessaging.instance.getToken();
-           
-           // DIAGNOSTIC FALLBACK: If Flutter thinks it's null, check the Native side
-           if (fcmToken == null && Platform.isIOS && apnsToken != null) {
-              debugPrint("FCM Null on Dart, checking Native Bridge...");
-              final String? nativeToken = await platform.invokeMethod('getNativeFCMToken');
-              if (nativeToken != null) {
-                fcmToken = nativeToken;
-                debugPrint("✅ Native Bridge recovered FCM token: $fcmToken");
-              }
-           }
          } catch (e) {
-           debugPrint("Token Attempt Failed: $e");
+           debugPrint("Android FCM Token Error: $e");
          }
-         
-         if (fcmToken != null && (!Platform.isIOS || apnsToken != null)) break;
-         
-         await Future.delayed(const Duration(seconds: 5));
-         retries--;
+       } else {
+         // iOS: RETRY LOOP - Apple APNs can be slow on first launch
+         int retries = 5;
+         while (retries > 0 && (fcmToken == null || apnsToken == null)) {
+           if (mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(
+               SnackBar(
+                 backgroundColor: Colors.blueGrey, 
+                 content: Text("⏳ Attempting native handshake... (${6 - retries}/5)"), 
+                 duration: const Duration(seconds: 2)
+               ),
+             );
+           }
+           
+           try {
+             apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+             fcmToken = await FirebaseMessaging.instance.getToken();
+             
+             // DIAGNOSTIC FALLBACK: If Flutter thinks it's null, check the Native side
+             if (fcmToken == null && apnsToken != null) {
+               debugPrint("FCM Null on Dart, checking Native Bridge...");
+               final String? nativeToken = await platform.invokeMethod('getNativeFCMToken');
+               if (nativeToken != null) {
+                 fcmToken = nativeToken;
+                 debugPrint("✅ Native Bridge recovered FCM token: $fcmToken");
+               }
+             }
+           } catch (e) {
+             debugPrint("Token Attempt Failed: $e");
+           }
+           
+           if (fcmToken != null && apnsToken != null) break;
+           
+           await Future.delayed(const Duration(seconds: 5));
+           retries--;
+         }
        }
 
        await FirebaseFirestore.instance.collection('users').doc(widget.userId).set({

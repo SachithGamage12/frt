@@ -18,6 +18,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'call_page.dart';
 import 'dart:math' as math;
+import 'package:url_launcher/url_launcher.dart';
 
 String generateUuidV4() {
   final random = math.Random();
@@ -862,7 +863,8 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
   File? _profileImage;
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _mobileController = TextEditingController();
-  bool _isLoading = false; // Track loading state
+  bool _isLoading = false;
+  bool _privacyAccepted = false; // v22: App Store requirement
 
   final ImagePicker _picker = ImagePicker();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -944,6 +946,12 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
   }
 
   Future<void> _saveData() async {
+    if (!_privacyAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please accept the Privacy Policy to continue.')),
+      );
+      return;
+    }
     if (_nameController.text.isEmpty || _profileImage == null || _mobileController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter your name, mobile number, and select a profile picture')),
@@ -1108,7 +1116,48 @@ class _WelcomePageState extends State<WelcomePage> with SingleTickerProviderStat
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
+                // v22: Privacy Policy checkbox (App Store requirement)
+                SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.85,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Checkbox(
+                        value: _privacyAccepted,
+                        activeColor: const Color(0xFF00E5FF),
+                        checkColor: Colors.black,
+                        side: const BorderSide(color: Colors.white54),
+                        onChanged: (val) => setState(() => _privacyAccepted = val ?? false),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () async {
+                            final uri = Uri.parse('https://lankafrt.com/privacy-policy.html');
+                            if (await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.externalApplication);
+                          },
+                          child: const Text.rich(
+                            TextSpan(
+                              text: 'I agree to the ',
+                              style: TextStyle(color: Colors.white70, fontSize: 13),
+                              children: [
+                                TextSpan(
+                                  text: 'Privacy Policy',
+                                  style: TextStyle(
+                                    color: Color(0xFF00E5FF),
+                                    decoration: TextDecoration.underline,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 _isLoading
                     ? const CircularProgressIndicator(
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.yellow),

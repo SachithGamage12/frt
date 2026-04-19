@@ -124,6 +124,8 @@ class _LocationViewPageState extends State<LocationViewPage> {
     });
   }
 
+  // v22: Camera only animates on first load. Auto-follow removed to prevent
+  // annoying map jump when viewer is panning. Use GPS button to re-center.
   void _updateCamera(LatLng position) {
     if (!_initialPositionSet) {
       _mapController.animateCamera(
@@ -137,11 +139,8 @@ class _LocationViewPageState extends State<LocationViewPage> {
         ),
       );
       _initialPositionSet = true;
-    } else {
-      _mapController.animateCamera(
-        CameraUpdate.newLatLng(position),
-      );
     }
+    // After first load: do NOT auto-follow — GPS FAB button handles re-centering
   }
 
   void _updatePolyline() {
@@ -289,8 +288,8 @@ class _LocationViewPageState extends State<LocationViewPage> {
       });
       _updateCamera(newPosition);
 
-      // Only add to the drawn path if we moved more than 0.5 meters
-      if (distance > 0.5 || _rawPoints.isEmpty) {
+      // v22: Only add to path if moved >= 10 meters (prevents phantom lines from phone tilt/GPS flicker)
+      if (distance >= 10 || _rawPoints.isEmpty) {
         setState(() {
           _rawPoints.add(newPosition);
           _pathPoints.add(newPosition);
