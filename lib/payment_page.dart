@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'interface.dart';
 import 'main.dart';
 import 'style_utils.dart';
+import 'guide_utils.dart';
 
 class PaymentPage extends StatefulWidget {
   final String userId;
@@ -29,6 +30,13 @@ class _PaymentPageState extends State<PaymentPage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   Timer? _sliderTimer;
+
+
+  // v33: Onboarding Keys
+  final GlobalKey _subscriptionBoxKey = GlobalKey();
+  final GlobalKey _uploadBoxKey = GlobalKey();
+  final GlobalKey _submitButtonKey = GlobalKey();
+  final GlobalKey _promoBoxKey = GlobalKey();
 
   void _showErrorDialog(String message) {
     AppAlerts.show(context, message, isError: true);
@@ -67,6 +75,59 @@ class _PaymentPageState extends State<PaymentPage> {
   void initState() {
     super.initState();
     _startSlider();
+    
+    // v33: Check if onboarding is needed
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final shown = prefs.getBool('onboarding_payment_shown') ?? false;
+      if (!shown) {
+        _showOnboarding();
+      }
+    });
+  }
+
+  void _showOnboarding() {
+    const sequence = [
+      {'key': 'subscription', 'text': 'Activate your FRT subscription for just LKR 350/month and start tracking your family’s journeys safely. Cancel anytime from your profile.'},
+      {'key': 'upload', 'text': 'Upload your payment slip here to activate your FRT subscription.'},
+      {'key': 'submit', 'text': 'Submit your payment details for review. We’ll verify and activate your FRT account shortly.'},
+      {'key': 'promo', 'text': 'Activate with connection code'},
+    ];
+
+    int step = 0;
+
+    void showNext() async {
+      if (step >= sequence.length) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('onboarding_payment_shown', true);
+        return;
+      }
+
+      final current = sequence[step];
+      GlobalKey? targetKey;
+      if (current['key'] == 'subscription') targetKey = _subscriptionBoxKey;
+      else if (current['key'] == 'upload') targetKey = _uploadBoxKey;
+      else if (current['key'] == 'submit') targetKey = _submitButtonKey;
+      else if (current['key'] == 'promo') targetKey = _promoBoxKey;
+
+      if (targetKey != null && targetKey.currentContext != null) {
+        OnboardingGuide.show(
+          context: context,
+          targetKey: targetKey,
+          message: current['text']!,
+          onOk: () {
+            step++;
+            showNext();
+          },
+        );
+      } else {
+        // If widget not visible yet, skip or retry
+        step++;
+        showNext();
+      }
+    }
+
+    showNext();
   }
 
   void _startSlider() {
@@ -303,6 +364,7 @@ class _PaymentPageState extends State<PaymentPage> {
         };
 
         return Container(
+          key: _subscriptionBoxKey,
           width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
@@ -352,6 +414,7 @@ class _PaymentPageState extends State<PaymentPage> {
     return Column(
       children: [
         GestureDetector(
+          key: _uploadBoxKey,
           onTap: _pickFile,
           child: Container(
             width: double.infinity,
@@ -373,6 +436,7 @@ class _PaymentPageState extends State<PaymentPage> {
         ),
         const SizedBox(height: 20),
         SizedBox(
+          key: _submitButtonKey,
           width: double.infinity,
           height: 55,
           child: ElevatedButton(
@@ -393,6 +457,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
   Widget _buildPromoSection() {
     return Container(
+      key: _promoBoxKey,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),

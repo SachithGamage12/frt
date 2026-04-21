@@ -20,8 +20,8 @@ import 'user_details_page.dart';
 import 'location_view_page.dart';
 import 'call_page.dart';
 import 'style_utils.dart';
-import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'globals.dart';
+import 'guide_utils.dart';
 import 'dart:math' as math;
 
 // v32: UUID generator for CallKit - iOS requires valid UUIDv4 or triggers SIGTRAP
@@ -62,8 +62,10 @@ class _InterfacePageState extends State<InterfacePage>
   bool _isCallOpening = false;
 
   bool _isHandlingQr = false;
-  int _tourStep = 0;
-  bool _showTour = false;
+  
+  // v33: Premium Onboarding
+  final GlobalKey _addButtonKey = GlobalKey();
+  final GlobalKey _circlesListKey = GlobalKey();
 
   @override
   void initState() {
@@ -83,7 +85,7 @@ class _InterfacePageState extends State<InterfacePage>
     _requestBatteryOptimization();
     _resumeLiveLocationSharing();
     _listenForIncomingCalls();
-    _checkFirstTime();
+    _checkOnboarding();
     _listenForCallKitEvents();
     
     // Attempt silent sync late in the lifecycle to catch tokens that weren't ready at startup
@@ -294,88 +296,55 @@ class _InterfacePageState extends State<InterfacePage>
     );
   }
 
-  Future<void> _checkFirstTime() async {
+  Future<void> _checkOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
-    // User requested "show always" unless "never show again" is clicked
-    bool isTourHiddenPermanently = prefs.getBool('hideTourPermanently') ?? false;
     
-    if (!isTourHiddenPermanently) {
-      if (mounted) {
-        setState(() {
-          _showTour = true;
-          _tourStep = 1;
-        });
+    // Check if user is activated (subscription logic)
+    final isActivated = _userData?['isAppUnlocked'] == true;
+    if (!isActivated) return;
+
+    // v33: iOS Permissions Alert (iOS Only)
+    if (Platform.isIOS) {
+      final hidePermAlert = prefs.getBool('hide_ios_perm_alert') ?? false;
+      if (!hidePermAlert) {
+        _showModernPermissionAlert();
       }
     }
-  }
 
-  Future<void> _completeTour() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('hasSeenTour', true);
-    if (mounted) {
-      setState(() {
-        _showTour = false;
-        _tourStep = 0;
-      });
+    // Step-by-step Tooltips
+    final hidePlusTooltip = prefs.getBool('hide_plus_tooltip') ?? false;
+    if (!hidePlusTooltip) {
+      _showPlusButtonTooltip();
     }
   }
 
-  Widget _buildTourOverlay() {
-    if (!_showTour) return const SizedBox.shrink();
-
-    String title = "";
-    String desc = "";
-    IconData icon = Icons.info;
-
-    switch (_tourStep) {
-      case 1:
-        title = "Step 1: Account Setup";
-        desc = "Enter your mobile and password. Give all permissions (Location, Notifications, Camera) for full tracking.";
-        icon = Icons.person_add_outlined;
-        break;
-      case 2:
-        title = "Step 2: Activation";
-        desc = "After paying, use your 10-digit Code in the Subscription page to unlock real-time mapping.";
-        icon = Icons.vpn_key_outlined;
-        break;
-      case 3:
-        title = "Step 3: Track Others";
-        desc = "Scan your family's QR code or use the '+' button to start tracking their live movement.";
-        icon = Icons.qr_code_scanner_outlined;
-        break;
-      case 4:
-        title = "Step 4: Managing Profile";
-        desc = "Update your name/photo in Profile. Use the Settings Gear to 'Unsubscribe' your account safely.";
-        icon = Icons.manage_accounts_outlined;
-        break;
-      case 5:
-        title = "Final Step: iOS Call Fix";
-        desc = "IMPORTANT: For background calls, enable 'Background App Refresh' and set location to 'Always Allow'.";
-        icon = Icons.phonelink_setup;
-        break;
-    }
-
-    return Container(
-      color: Colors.black.withOpacity(0.9),
-      child: Center(
+  void _showModernPermissionAlert() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
         child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 30),
-          padding: const EdgeInsets.all(30),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-            boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.1), blurRadius: 20)],
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+            boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.15), blurRadius: 40)],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 80, color: AppColors.primary),
-              const SizedBox(height: 25),
-              Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+              const Icon(Icons.security, color: AppColors.primary, size: 50),
+              const SizedBox(height: 20),
+              const Text('iOS Security & Tracking', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 15),
-              Text(desc, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 16)),
-              const SizedBox(height: 35),
+              const Text(
+                'Turn on Background Refresh and always Location access with precise location to work FRT app perfectly.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+              ),
+              const SizedBox(height: 30),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -383,32 +352,20 @@ class _InterfacePageState extends State<InterfacePage>
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  onPressed: () {
-                    if (_tourStep < 5) {
-                      setState(() => _tourStep++);
-                    } else {
-                      _completeTour();
-                    }
-                  },
-                  child: Text(_tourStep == 5 ? "GOT IT!" : "NEXT", style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
-              const SizedBox(height: 15),
+              const SizedBox(height: 10),
               TextButton(
                 onPressed: () async {
                   final prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('hideTourPermanently', true);
-                  setState(() {
-                    _showTour = false;
-                    _tourStep = 0;
-                  });
+                  await prefs.setBool('hide_ios_perm_alert', true);
+                  Navigator.pop(context);
                 },
-                child: const Text(
-                  "NEVER SHOW AGAIN",
-                  style: TextStyle(color: Colors.white24, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-                ),
+                child: const Text('Never show again', style: TextStyle(color: Colors.white24, fontSize: 12)),
               ),
             ],
           ),
@@ -416,6 +373,41 @@ class _InterfacePageState extends State<InterfacePage>
       ),
     );
   }
+
+  void _showPlusButtonTooltip() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_addButtonKey.currentContext == null) return;
+      
+      OnboardingGuide.show(
+        context: context,
+        targetKey: _addButtonKey,
+        message: 'Press to scan other device QR or share location to access from other device your location',
+        onOk: () async {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('hide_plus_tooltip', true);
+          _showCirclesTooltip();
+        },
+      );
+    });
+  }
+
+  void _showCirclesTooltip() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hideCirclesTooltip = prefs.getBool('hide_circles_tooltip') ?? false;
+    if (hideCirclesTooltip) return;
+
+    if (_circlesListKey.currentContext != null) {
+      OnboardingGuide.show(
+        context: context,
+        targetKey: _circlesListKey,
+        message: 'Scanned device profiles show in the tracked circles with call option with contact with your device .if dont want anymore to share your location use delete option to remove tracked person',
+        onOk: () async {
+          await prefs.setBool('hide_circles_tooltip', true);
+        },
+      );
+    }
+  }
+
 
   void _listenForIncomingCalls() {
     // Delay listener slightly to ensure Firebase and UI are stable
@@ -452,7 +444,6 @@ class _InterfacePageState extends State<InterfacePage>
           } else {
             _currentCallChannel = null;
             _isCallOpening = false;
-            FlutterRingtonePlayer().stop();
             await FlutterCallkitIncoming.endAllCalls();
           }
         } catch (e) {
@@ -1359,8 +1350,9 @@ class _InterfacePageState extends State<InterfacePage>
                   _buildLiveStatusBar(),
                 
                 const SizedBox(height: 10),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                Padding(
+                  key: _circlesListKey,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   child: Row(
                     children: [
                       Text(
@@ -1398,9 +1390,6 @@ class _InterfacePageState extends State<InterfacePage>
                   ),
               ],
             ),
-          // App Tour Overlay
-          if (_showTour)
-            _buildTourOverlay(),
           Positioned(
             bottom: 20,
             right: 20,
@@ -1423,6 +1412,7 @@ class _InterfacePageState extends State<InterfacePage>
                   ),
                 const SizedBox(height: 10),
                 FloatingActionButton(
+                  key: _addButtonKey,
                   backgroundColor: Colors.green,
                   onPressed: () {
                     showModalBottomSheet(

@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -15,7 +16,6 @@ import 'globals.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'call_page.dart';
 import 'dart:math' as math;
 import 'package:url_launcher/url_launcher.dart';
@@ -80,7 +80,25 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 }
 
+StreamSubscription? _globalCallSyncSub;
+
+void _startGlobalCallSyncListener(String userId) {
+  _globalCallSyncSub?.cancel();
+  _globalCallSyncSub = FirebaseFirestore.instance
+      .collection('calls')
+      .doc(userId)
+      .snapshots()
+      .listen((snapshot) {
+        if (!snapshot.exists || (snapshot.data()?['status'] == 'ended')) {
+          debugPrint("Global Sync: Call ended via Firestore. Dismissing CallKit.");
+          FlutterCallkitIncoming.endAllCalls();
+          _globalCallSyncSub?.cancel();
+        }
+      }, onError: (e) => debugPrint("Global Sync Error: $e"));
+}
+
 void main() async {
+
   WidgetsFlutterBinding.ensureInitialized();
   try {
     // v31: Idempotent initialization check to prevent settings conflict on iOS
@@ -126,6 +144,7 @@ void main() async {
                 InitialCallState.targetCallerId = extra['callerId'];
                 InitialCallState.targetCallerName = extra['callerName'];
                 InitialCallState.hasPendingCall = true;
+                _globalCallSyncSub?.cancel(); // Accept event stops the ringing listener
                 
                 // v30: Enhanced navigation - check navigatorKey and retry if needed
                 void navigateToCall() {
@@ -150,6 +169,7 @@ void main() async {
              }
           } else if (event.event == 'ACTION_CALL_DECLINE' || event.event == 'ACTION_CALL_ENDED' || event.event == 'ACTION_CALL_TIMEOUT') {
              InitialCallState.hasPendingCall = false;
+             _globalCallSyncSub?.cancel();
              // v24: Delete Firestore call doc so CALLER side also knows call was declined/ended
              SharedPreferences.getInstance().then((prefs) async {
                try {
@@ -291,6 +311,11 @@ Future<void> _showIncomingCallUI(Map<String, dynamic> data) async {
     ),
   );
   await FlutterCallkitIncoming.showCallkitIncoming(params);
+  // v33: Start global sync listener
+  SharedPreferences.getInstance().then((prefs) {
+    final userId = prefs.getString('mobile');
+    if (userId != null) _startGlobalCallSyncListener(userId);
+  });
 }
 
 class MyApp extends StatelessWidget {
