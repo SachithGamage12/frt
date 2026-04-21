@@ -4,15 +4,6 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-		<key>NSAllowsArbitraryLoadsForMedia</key>
-		<true/>
-		<key>NSAllowsArbitraryLoadsInWebContent</key>
-		<true/>
-	</dict>
 	<key>CFBundleDisplayName</key>
 	<string>Family Road Track</string>
 	<key>CFBundleExecutable</key>
@@ -33,6 +24,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+
+	<!-- Network -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -42,6 +35,8 @@
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
 	</dict>
+
+	<!-- UI -->
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -63,16 +58,31 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- Photo & Camera -->
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need access to your photo library to let you select images.</string>
+	<string>Family Road Track uses your photo library to let you upload a profile picture and share payment receipts with the admin for account activation.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>We need access to your camera to let you take photos and scan QR codes.</string>
+	<string>Family Road Track uses your camera to scan QR codes shared by family members, enabling you to view their live location on the map.</string>
+
+	<!-- Location — Apple requires specific, example-based descriptions -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We need access to your location to show it on the map.</string>
+	<string>Family Road Track uses your precise location to display your real-time position on a shared family map. For example, a parent can share their location with their child during a school commute so the child knows when to expect them.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>We need access to your location to provide continuous services.</string>
+	<string>Family Road Track uses your location in the background to continuously update your position on the family map, even when the app is minimised. This ensures your family members can always see your latest location during active live-sharing sessions.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>We need access to your location even in the background to ensure your family can track your safety.</string>
+	<string>Family Road Track needs always-on location access so your family members can track your safety in real time, including when your screen is off or you are using other apps during a live location sharing session.</string>
+
+	<!-- Microphone -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Family Road Track uses your microphone for voice calls between family members directly within the app, allowing you to communicate hands-free while viewing the live location map.</string>
+
+	<!-- App Tracking Transparency (ATT) — Guideline 5.1.2(i) -->
+	<!-- This app does NOT track users for advertising. Location is used only for family safety features. -->
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Family Road Track does not use your data for advertising purposes or share it with data brokers. Your location is used solely to share your real-time position with family members you have explicitly approved inside the app.</string>
+
+	<!-- Background Modes -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
@@ -86,8 +96,8 @@
 	<array>
 		<string>dev.flutter.background.refresh</string>
 	</array>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>This app requires microphone access for Voice Calls with your contacts.</string>
+
+	<!-- Firebase -->
 	<key>FirebaseMessagingAutoInitEnabled</key>
 	<true/>
 	<key>FirebaseAppDelegateProxyEnabled</key>
