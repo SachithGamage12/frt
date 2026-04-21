@@ -21,6 +21,7 @@ import 'location_view_page.dart';
 import 'call_page.dart';
 import 'style_utils.dart';
 import 'globals.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 import 'guide_utils.dart';
 import 'dart:math' as math;
 
@@ -1390,6 +1391,34 @@ class _InterfacePageState extends State<InterfacePage>
                   ),
               ],
             ),
+          // v33: Floating Help Box
+          Positioned(
+            left: 20,
+            bottom: 30,
+            child: GestureDetector(
+              onTap: () => launchUrlString("https://www.lankafrt.com"),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white10),
+                  boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.help_outline, color: AppColors.primary, size: 16),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Cant setup the App visit www.lankafrt.com",
+                      style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           Positioned(
             bottom: 20,
             right: 20,

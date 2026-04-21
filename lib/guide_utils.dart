@@ -12,6 +12,15 @@ class OnboardingGuide {
     required VoidCallback onOk,
     bool showOk = true,
   }) {
+    // v33: Auto-scroll to target if in scrollable
+    if (targetKey.currentContext != null) {
+      Scrollable.ensureVisible(
+        targetKey.currentContext!,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    }
+
     _overlayEntry?.remove();
     _overlayEntry = OverlayEntry(
       builder: (context) => _OnboardingOverlay(
@@ -25,7 +34,13 @@ class OnboardingGuide {
         showOk: showOk,
       ),
     );
-    Overlay.of(context).insert(_overlayEntry!);
+    
+    // Slight delay to allow scrolling to settle before showing overlay
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (context.mounted) {
+        Overlay.of(context).insert(_overlayEntry!);
+      }
+    });
   }
 
   static void hide() {
@@ -54,36 +69,16 @@ class _OnboardingOverlay extends StatefulWidget {
 class _OnboardingOverlayState extends State<_OnboardingOverlay> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
-  Rect? _targetRect;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 600),
     );
-    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.elasticOut);
     _controller.forward();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _calculateTargetRect();
-    });
-  }
-
-  void _calculateTargetRect() {
-    final renderBox = widget.targetKey.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox != null) {
-      final offset = renderBox.localToGlobal(Offset.zero);
-      setState(() {
-        _targetRect = Rect.fromLTWH(
-          offset.dx,
-          offset.dy,
-          renderBox.size.width,
-          renderBox.size.height,
-        );
-      });
-    }
   }
 
   @override
@@ -94,30 +89,48 @@ class _OnboardingOverlayState extends State<_OnboardingOverlay> with SingleTicke
 
   @override
   Widget build(BuildContext context) {
-    if (_targetRect == null) return const SizedBox.shrink();
+    // v33: Improved responsive positioning - dynamic calculation based on current render position
+    final renderBox = widget.targetKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return const SizedBox.shrink();
+
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final offset = renderBox.localToGlobal(Offset.zero, ancestor: overlay);
+    final targetRect = Rect.fromLTWH(
+      offset.dx,
+      offset.dy,
+      renderBox.size.width,
+      renderBox.size.height,
+    );
 
     final screenSize = MediaQuery.of(context).size;
     
     // Determine tooltip position
-    bool isTooltipAbove = _targetRect!.top > screenSize.height / 2;
+    bool isTooltipAbove = targetRect.top > screenSize.height / 2;
     double tooltipTop = isTooltipAbove 
-        ? _targetRect!.top - 180 
-        : _targetRect!.bottom + 20;
+        ? targetRect.top - 180 
+        : targetRect.bottom + 20;
 
     return Material(
       color: Colors.transparent,
       child: Stack(
         children: [
-          // Background Blur & Dim
-          GestureDetector(
-            onTap: () {}, // Blocks touches to underlying UI
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-              child: CustomPaint(
-                size: screenSize,
-                painter: _GuidePainter(targetRect: _targetRect!),
+          // Background Blur & Dim with Sharp Hole
+          IgnorePointer(
+            child: ClipPath(
+              clipper: _InvertedRRectClipper(targetRect: targetRect),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                child: Container(
+                  color: Colors.black.withOpacity(0.6),
+                ),
               ),
             ),
+          ),
+
+          // Border around the hole (Drawn separately to stay sharp)
+          CustomPaint(
+            size: screenSize,
+            painter: _HoleBorderPainter(targetRect: targetRect),
           ),
 
           // Tooltip Box
@@ -132,7 +145,7 @@ class _OnboardingOverlayState extends State<_OnboardingOverlay> with SingleTicke
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: AppColors.surface.withOpacity(0.9),
+                    color: AppColors.surface.withOpacity(0.95),
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(color: AppColors.primary.withOpacity(0.5), width: 1.5),
                     boxShadow: [
@@ -146,7 +159,6 @@ class _OnboardingOverlayState extends State<_OnboardingOverlay> with SingleTicke
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Accent line animation simulation via decoration
                       Container(
                         height: 2,
                         width: 40,
@@ -194,40 +206,45 @@ class _OnboardingOverlayState extends State<_OnboardingOverlay> with SingleTicke
   }
 }
 
-class _GuidePainter extends CustomPainter {
+class _InvertedRRectClipper extends CustomClipper<Path> {
   final Rect targetRect;
 
-  _GuidePainter({required this.targetRect});
+  _InvertedRRectClipper({required this.targetRect});
+
+  @override
+  Path getClip(Size size) {
+    return Path.combine(
+      PathOperation.difference,
+      Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height)),
+      Path()..addRRect(
+        RRect.fromRectAndRadius(
+          targetRect.inflate(8),
+          const Radius.circular(16),
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldReclip(covariant _InvertedRRectClipper oldClipper) => 
+      oldClipper.targetRect != targetRect;
+}
+
+class _HoleBorderPainter extends CustomPainter {
+  final Rect targetRect;
+
+  _HoleBorderPainter({required this.targetRect});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black.withOpacity(0.75);
-    
-    // Create a path for the full screen with a hole for the target
-    final backgroundPath = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-    
-    // Add rounded rectangle hole for the target widget
-    final targetPath = Path()..addRRect(
-      RRect.fromRectAndRadius(
-        targetRect.inflate(10), // Add some padding around the widget
-        const Radius.circular(16),
-      ),
-    );
-
-    // Combine using XOR to create the hole
-    final finalPath = Path.combine(PathOperation.difference, backgroundPath, targetPath);
-    
-    canvas.drawPath(finalPath, paint);
-
-    // Add a glowing border around the hole
     final borderPaint = Paint()
-      ..color = AppColors.primary.withOpacity(0.5)
+      ..color = AppColors.primary
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    
+      ..strokeWidth = 2.5;
+
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        targetRect.inflate(10),
+        targetRect.inflate(8),
         const Radius.circular(16),
       ),
       borderPaint,
@@ -235,5 +252,6 @@ class _GuidePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _HoleBorderPainter oldDelegate) => 
+      oldDelegate.targetRect != targetRect;
 }
