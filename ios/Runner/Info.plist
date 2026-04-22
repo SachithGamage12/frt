@@ -70,10 +70,6 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Family Road Track uses your microphone for voice calls between family members directly within the app, allowing you to communicate hands-free while viewing the live location map.</string>
 
-	<!-- App Tracking Transparency (ATT) — Guideline 5.1.2(i) -->
-	<!-- This app does NOT track users for advertising. Location is used only for family safety features. -->
-	<key>NSUserTrackingUsageDescription</key>
-	<string>Family Road Track does not use your data for advertising purposes or share it with data brokers. Your location is used solely to share your real-time position with family members you have explicitly approved inside the app.</string>
 
 	<!-- Background Modes -->
 	<key>UIBackgroundModes</key>
