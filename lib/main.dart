@@ -9,7 +9,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'interface.dart';
-import 'payment_page.dart';
 import 'admin_panel.dart';
 import 'style_utils.dart';
 import 'globals.dart';
@@ -70,7 +69,7 @@ class AwaitingActivationPage extends StatelessWidget {
                     ),
                     SizedBox(height: 12),
                     Text(
-                      '1. Log in to your dashboard at www.lankafrt.com\n2. Complete the LKR 350 monthly payment\n3. Wait for admin approval',
+                      '1. Log in to your dashboard at www.lankafrt.com\n2. Follow the activation steps provided there.\n3. Your account will be active within 24 hours.',
                       style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.6),
                     ),
                   ],
@@ -622,6 +621,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   bool _rememberMe = false;
   bool _obscurePassword = true;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _showRegistrationLink = false;
 
 
   @override
@@ -665,6 +665,20 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
     _controller.forward();
     _loadRememberMe();
+    _checkRegistrationToggle();
+  }
+
+  Future<void> _checkRegistrationToggle() async {
+    try {
+      final doc = await _firestore.collection('settings').doc('appConfig').get();
+      if (doc.exists) {
+        setState(() {
+          _showRegistrationLink = doc.data()?['showRegistrationLink'] ?? false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error checking toggle: $e");
+    }
   }
 
   Future<void> _loadRememberMe() async {
@@ -902,26 +916,27 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 ),
                 const SizedBox(height: 20),
                 const SizedBox(height: 30),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 40),
-                  child: Column(
-                    children: [
-                      Text(
-                        "Don't have an account?",
-                        style: TextStyle(color: Colors.white54, fontSize: 13),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        "Visit www.lankafrt.com to register",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                if (_showRegistrationLink)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 40),
+                    child: Column(
+                      children: [
+                        Text(
+                          "Don't have an account?",
+                          style: TextStyle(color: Colors.white54, fontSize: 13),
                         ),
-                      ),
-                    ],
+                        SizedBox(height: 4),
+                        Text(
+                          "Visit www.lankafrt.com to register",
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -1472,13 +1487,11 @@ UcodeX Solution and FRT are not liable for any physical or digital damages, loss
         const SnackBar(content: Text('Data saved successfully')),
       );
 
-      DocumentSnapshot userDoc = await _firestore.collection('users').doc(widget.userId).get();
-      Map<String, dynamic>? userData = userDoc.data() as Map<String, dynamic>?;
 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => PaymentPage(userId: widget.userId, userData: userData ?? {}),
+          builder: (context) => AwaitingActivationPage(userId: widget.userId),
         ),
       );
     } catch (e) {

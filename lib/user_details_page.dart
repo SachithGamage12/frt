@@ -282,34 +282,10 @@ class _UserDetailsPageState extends State<UserDetailsPage> with SingleTickerProv
                                     },
                                   ),
                                 ),
-                              if (widget.userData['promoCode'] != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 10, bottom: 4, left: 4, right: 4),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(14),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.08),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                                    ),
-                                    child: const Row(
-                                      children: [
-                                        Icon(Icons.info_outline, color: AppColors.primary, size: 18),
-                                        SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text(
-                                            'Use this Connection Code to add a FREE 1-month subscription to another account on FRT App.',
-                                            style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.5),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
                               const SizedBox(height: 30),
                               ElevatedButton.icon(
                                 onPressed: () async {
-                                  final Uri url = Uri.parse("https://www.lankafrt.com/delete");
+                                  final Uri url = Uri.parse("https://www.lankafrt.com/login.html");
                                   if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
                                     AppAlerts.show(context, 'Could not open website', isError: true);
                                   }
