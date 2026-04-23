@@ -1,5 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -88,6 +90,7 @@ class _InterfacePageState extends State<InterfacePage>
     _listenForIncomingCalls();
     _checkOnboarding();
     _listenForCallKitEvents();
+    _checkTutorialVideo();
     
     // Attempt silent sync late in the lifecycle to catch tokens that weren't ready at startup
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncCallingData());
@@ -120,6 +123,36 @@ class _InterfacePageState extends State<InterfacePage>
         ),
       );
     }
+  }
+
+  Future<void> _checkTutorialVideo() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final bool neverShow = prefs.getBool('neverShowTutorial') ?? false;
+      if (neverShow) return;
+
+      final doc = await FirebaseFirestore.instance.collection('settings').doc('appConfig').get();
+      if (doc.exists) {
+        final data = doc.data();
+        if (data != null && data.containsKey('tutorialVideoUrl')) {
+          final String? videoUrl = data['tutorialVideoUrl'];
+          if (videoUrl != null && videoUrl.isNotEmpty) {
+            await Future.delayed(const Duration(seconds: 4));
+            if (mounted) _showTutorialPopup(videoUrl);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Tutorial error: $e");
+    }
+  }
+
+  void _showTutorialPopup(String videoUrl) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => TutorialVideoDialog(videoUrl: videoUrl),
+    );
   }
 
   void _listenForCallKitEvents() {
@@ -2211,4 +2244,132 @@ class ScannerOverlayPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class TutorialVideoDialog extends StatefulWidget {
+  final String videoUrl;
+  const TutorialVideoDialog({super.key, required this.videoUrl});
+
+  @override
+  _TutorialVideoDialogState createState() => _TutorialVideoDialogState();
+}
+
+class _TutorialVideoDialogState extends State<TutorialVideoDialog> {
+  late VideoPlayerController _videoPlayerController;
+  ChewieController? _chewieController;
+  bool _neverShowAgain = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializePlayer();
+  }
+
+  Future<void> _initializePlayer() async {
+    _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+    await _videoPlayerController.initialize();
+    _chewieController = ChewieController(
+      videoPlayerController: _videoPlayerController,
+      autoPlay: true,
+      looping: false,
+      aspectRatio: _videoPlayerController.value.aspectRatio,
+      placeholder: const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF))),
+    );
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _videoPlayerController.dispose();
+    _chewieController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _close() async {
+    if (_neverShowAgain) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('neverShowTutorial', true);
+    }
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(20),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0f172a),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white10),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, offset: const Offset(0, 10))],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'This is how FRT is working',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white54),
+                    onPressed: _close,
+                  ),
+                ],
+              ),
+            ),
+            
+            // Video Area
+            AspectRatio(
+              aspectRatio: _chewieController?.aspectRatio ?? 16 / 9,
+              child: _chewieController != null
+                  ? ClipRRect(
+                    borderRadius: BorderRadius.circular(0),
+                    child: Chewie(controller: _chewieController!),
+                  )
+                  : const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF))),
+            ),
+
+            // Footer
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: Checkbox(
+                      value: _neverShowAgain,
+                      activeColor: const Color(0xFF00E5FF),
+                      checkColor: Colors.black,
+                      side: const BorderSide(color: Colors.white24),
+                      onChanged: (val) => setState(() => _neverShowAgain = val ?? false),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Never show again',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _close,
+                    child: const Text('GOT IT', style: TextStyle(color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

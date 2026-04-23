@@ -621,7 +621,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   bool _rememberMe = false;
   bool _obscurePassword = true;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  bool _showRegistrationLink = false;
+  bool _showFakeRegister = false;
+  bool _showRealRegister = false;
 
 
   @override
@@ -673,7 +674,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final doc = await _firestore.collection('settings').doc('appConfig').get();
       if (doc.exists) {
         setState(() {
-          _showRegistrationLink = doc.data()?['showRegistrationLink'] ?? false;
+          _showFakeRegister = doc.data()?['showFakeRegister'] ?? false;
+          _showRealRegister = doc.data()?['showRealRegister'] ?? false;
         });
       }
     } catch (e) {
@@ -916,22 +918,51 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 ),
                 const SizedBox(height: 20),
                 const SizedBox(height: 30),
-                if (_showRegistrationLink)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 40),
+                if (_showFakeRegister)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20),
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const FakeRegisterPage()),
+                        );
+                      },
+                      child: const Text(
+                        "Register New Account",
+                        style: TextStyle(
+                          color: Colors.white70,
+                          decoration: TextDecoration.underline,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_showRealRegister)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
                     child: Column(
                       children: [
-                        Text(
+                        const Text(
                           "Don't have an account?",
                           style: TextStyle(color: Colors.white54, fontSize: 13),
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          "Visit www.lankafrt.com to register",
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: () async {
+                            final uri = Uri.parse("https://www.lankafrt.com/login.html");
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            }
+                          },
+                          child: const Text(
+                            "Register here on website",
+                            style: TextStyle(
+                              color: Color(0xFF00E5FF),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
                         ),
                       ],
@@ -954,6 +985,203 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   child: Container(
                     height: 100,
                     decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF00E5FF), Color(0xFF00B4D8)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class FakeRegisterPage extends StatefulWidget {
+  const FakeRegisterPage({super.key});
+
+  @override
+  _FakeRegisterPageState createState() => _FakeRegisterPageState();
+}
+
+class _FakeRegisterPageState extends State<FakeRegisterPage> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _circleAnimation;
+  late Animation<double> _textAnimation;
+  late Animation<Color?> _colorAnimation;
+  late Animation<double> _waveAnimation;
+  
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _mobileController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(duration: const Duration(seconds: 2), vsync: this);
+    _circleAnimation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _textAnimation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _controller, curve: const Interval(0.2, 1, curve: Curves.easeInOut)));
+    _colorAnimation = ColorTween(begin: Colors.purple, end: Colors.blue).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _waveAnimation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _controller, curve: const Interval(0.5, 1, curve: Curves.easeInOut)));
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _nameController.dispose();
+    _mobileController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fakeSubmit() async {
+    if (_nameController.text.isEmpty || _mobileController.text.isEmpty || _passwordController.text.isEmpty) {
+      AppAlerts.show(context, 'Please fill all fields', isError: true);
+      return;
+    }
+    setState(() => _isLoading = true);
+    await Future.delayed(const Duration(seconds: 2));
+    setState(() => _isLoading = false);
+    
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1e293b),
+          title: const Text('Registration Success', style: TextStyle(color: Color(0xFF00E5FF))),
+          content: const Text(
+            'Admin will review your details and within 24 hours we will activate your account. You will receive a notification once activated.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK', style: TextStyle(color: Color(0xFF00E5FF))),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          Positioned(
+            top: -MediaQuery.of(context).size.height * 0.2,
+            left: -MediaQuery.of(context).size.width * 0.2,
+            child: AnimatedBuilder(
+              animation: _circleAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _circleAnimation.value,
+                  child: Container(
+                    width: MediaQuery.of(context).size.width * 0.8,
+                    height: MediaQuery.of(context).size.width * 0.8,
+                    decoration: const BoxDecoration(color: Color(0xFF00E5FF), shape: BoxShape.circle),
+                  ),
+                );
+              },
+            ),
+          ),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Create Account',
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 40),
+                  TextField(
+                    controller: _nameController,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      hintText: 'Full Name',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: _mobileController,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      hintText: 'Mobile Number',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      hintText: 'Password',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  _isLoading
+                      ? const CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00E5FF)))
+                      : ElevatedButton(
+                          onPressed: _fakeSubmit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00E5FF),
+                            padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 15),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Register', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
+                  const SizedBox(height: 20),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Back to Login', style: TextStyle(color: Colors.white54)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: AnimatedBuilder(
+              animation: _waveAnimation,
+              builder: (context, child) {
+                return ClipPath(
+                  clipper: WaveClipper(_waveAnimation.value),
+                  child: Container(
+                    height: 100,
+                    decoration: const BoxDecoration(
                       gradient: LinearGradient(
                         colors: [Color(0xFF00E5FF), Color(0xFF00B4D8)],
                         begin: Alignment.topLeft,
