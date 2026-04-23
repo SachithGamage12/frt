@@ -20,6 +20,75 @@ import 'call_page.dart';
 import 'dart:math' as math;
 import 'package:url_launcher/url_launcher.dart';
 
+class AwaitingActivationPage extends StatelessWidget {
+  final String userId;
+  const AwaitingActivationPage({super.key, required this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(30.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.timer_outlined, color: Colors.orangeAccent, size: 60),
+              ),
+              const SizedBox(height: 30),
+              const Text(
+                'Account Awaiting Activation',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Your account has been registered but tracking is not yet active.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 16),
+              ),
+              const SizedBox(height: 30),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: const Column(
+                  children: [
+                    Text(
+                      'HOW TO ACTIVATE?',
+                      style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      '1. Log in to your dashboard at www.lankafrt.com\n2. Complete the LKR 350 monthly payment\n3. Wait for admin approval',
+                      style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.6),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 40),
+              TextButton(
+                onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false),
+                child: const Text('Back to Login', style: TextStyle(color: Colors.white38)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 String generateUuidV4() {
   final random = math.Random();
   final bytes = List<int>.generate(16, (_) => random.nextInt(256));
@@ -450,7 +519,7 @@ class _FRTAnimationPageState extends State<FRTAnimationPage> with SingleTickerPr
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => PaymentPage(userId: mobile, userData: doc.data() as Map<String, dynamic>),
+              builder: (context) => AwaitingActivationPage(userId: mobile),
             ),
           );
         }
@@ -650,8 +719,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             await prefs.setBool('rememberMe', false);
           }
 
-          bool isUnlocked = doc.data()?['isAppUnlocked'] == true;
-          Timestamp? expiry = doc.data()?['subscriptionExpiry'] as Timestamp?;
+          final data = doc.data()!;
           
           // Store tokens (Unified Sync)
           try {
@@ -666,21 +734,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             print("Skipping token update: $e");
           }
 
-          if (isUnlocked && expiry != null && expiry.toDate().isBefore(DateTime.now())) {
-            isUnlocked = false;
-            await _firestore.collection('users').doc(_mobileController.text).update({'isAppUnlocked': false});
-          }
-
-          if (isUnlocked) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => InterfacePage(userId: _mobileController.text)),
+          if (data['isAppUnlocked'] == true) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => InterfacePage(userId: _mobileController.text),
+              ),
             );
           } else {
-            Navigator.pushReplacement(
-              context,
+            // v28: No in-app payment. Redirect to activation status page.
+            Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (context) => PaymentPage(userId: _mobileController.text, userData: doc.data() as Map<String, dynamic>),
+                builder: (context) => AwaitingActivationPage(userId: _mobileController.text),
               ),
             );
           }
@@ -837,19 +901,25 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   ),
                 ),
                 const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const WelcomePage()),
-                    );
-                  },
-                  child: const Text(
-                    'Not registered? Create an account',
-                    style: TextStyle(
-                      color: Colors.white,
-                      decoration: TextDecoration.underline,
-                    ),
+                const SizedBox(height: 30),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 40),
+                  child: Column(
+                    children: [
+                      Text(
+                        "Don't have an account?",
+                        style: TextStyle(color: Colors.white54, fontSize: 13),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        "Visit www.lankafrt.com to register",
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

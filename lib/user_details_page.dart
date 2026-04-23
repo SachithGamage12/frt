@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'unsubscribe_dialog.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'style_utils.dart';
 
 class UserDetailsPage extends StatefulWidget {
@@ -308,18 +308,14 @@ class _UserDetailsPageState extends State<UserDetailsPage> with SingleTickerProv
                                 ),
                               const SizedBox(height: 30),
                               ElevatedButton.icon(
-                                onPressed: () {
-                                  showDialog(
-                                    context: context,
-                                    barrierDismissible: false,
-                                    builder: (ctx) => UnsubscribeDialog(
-                                      userId: widget.userId,
-                                      userData: widget.userData,
-                                    ),
-                                  );
+                                onPressed: () async {
+                                  final Uri url = Uri.parse("https://www.lankafrt.com/delete");
+                                  if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+                                    AppAlerts.show(context, 'Could not open website', isError: true);
+                                  }
                                 },
-                                icon: const Icon(Icons.cancel_outlined, color: Colors.white),
-                                label: const Text("Cancel Subscription", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                icon: const Icon(Icons.delete_forever_outlined, color: Colors.white),
+                                label: const Text("Delete Account", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.redAccent.withOpacity(0.2),
                                   foregroundColor: Colors.redAccent,

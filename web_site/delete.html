@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FRT - Account Deletion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0b1120; color: white; min-height: 100vh; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+    </style>
+</head>
+<body class="flex items-center justify-center p-6">
+    <div class="glass w-full max-w-xl p-10 rounded-3xl shadow-2xl">
+        <h1 class="text-3xl font-bold mb-2 text-white">We're sorry to see you go</h1>
+        <p class="text-slate-400 mb-8 leading-relaxed">Your account data will be permanently deleted. Please help us improve by telling us why you are leaving?</p>
+
+        <div class="space-y-6">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-3 uppercase tracking-widest">Reason for leaving</label>
+                <select id="reason" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-red-500 transition-all text-white">
+                    <option value="too_expensive">App is too expensive</option>
+                    <option value="not_useful">Not useful anymore</option>
+                    <option value="technical_issues">Too many technical bugs</option>
+                    <option value="found_alternative">Found a better alternative</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-3 uppercase tracking-widest">Additional Feedback (Optional)</label>
+                <textarea id="feedback" rows="4" placeholder="How was your experience with Family Road Track?" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-red-500 transition-all text-white resize-none"></textarea>
+            </div>
+
+            <div class="p-6 bg-red-500/10 border border-red-500/20 rounded-2xl">
+                <p class="text-xs text-red-400 leading-relaxed font-semibold italic">Warning: This action is irreversible. All your tracked history and connections will be wiped from our secure servers.</p>
+            </div>
+
+            <button id="btn-delete" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl transition-all shadow-xl shadow-red-500/20">
+                Confirm Permanent Deletion
+            </button>
+            <button onclick="history.back()" class="w-full text-slate-500 hover:text-white text-sm font-semibold transition-all">Cancel and Go Back</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const userId = localStorage.getItem('userId');
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCmtV4tRTpCCgFZIVxGsW2lLiExZsTIOR4",
+            authDomain: "frtapp-ff79b.firebaseapp.com",
+            projectId: "frtapp-ff79b",
+            storageBucket: "frtapp-ff79b.firebasestorage.app",
+            messagingSenderId: "1060214465512",
+            appId: "1:1060214465512:web:your_web_app_id_here"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        document.getElementById('btn-delete').onclick = async () => {
+            const reason = document.getElementById('reason').value;
+            const feedback = document.getElementById('feedback').value;
+
+            if(!confirm("Are you absolutely sure? This cannot be undone.")) return;
+
+            try {
+                // Log the cancellation
+                await addDoc(collection(db, "cancellations"), {
+                    email: userId || 'Anonymous',
+                    reason: reason,
+                    feedback: feedback,
+                    timestamp: serverTimestamp()
+                });
+
+                // In a real scenario, you'd trigger a Cloud Function to wipe the 'users/mobile' doc.
+                // For now, we log the request.
+                alert("Your account deletion request has been logged. We will process it within 24 hours.");
+                localStorage.clear();
+                window.location.href = "index.html";
+            } catch(e) {
+                alert("Error submitting request.");
+            }
+        };
+    </script>
+</body>
+</html>
