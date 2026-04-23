@@ -950,7 +950,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                         const SizedBox(height: 4),
                         GestureDetector(
                           onTap: () async {
-                            final uri = Uri.parse("https://www.lankafrt.com/login.html");
+                            final uri = Uri.parse("https://lankafrt.com/register.html");
                             if (await canLaunchUrl(uri)) {
                               await launchUrl(uri, mode: LaunchMode.externalApplication);
                             }
@@ -1021,6 +1021,15 @@ class _FakeRegisterPageState extends State<FakeRegisterPage> with SingleTickerPr
   final TextEditingController _mobileController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
+  XFile? _image;
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() => _image = pickedFile);
+    }
+  }
 
   @override
   void initState() {
@@ -1117,7 +1126,21 @@ class _FakeRegisterPageState extends State<FakeRegisterPage> with SingleTickerPr
                     'Create Account',
                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 30),
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.white10,
+                      backgroundImage: _image != null ? FileImage(File(_image!.path)) : null,
+                      child: _image == null
+                          ? const Icon(Icons.add_a_photo, color: Color(0xFF00E5FF), size: 30)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text("Select Profile Picture", style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  const SizedBox(height: 30),
                   TextField(
                     controller: _nameController,
                     decoration: InputDecoration(

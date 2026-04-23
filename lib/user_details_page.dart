@@ -25,12 +25,24 @@ class _UserDetailsPageState extends State<UserDetailsPage> with SingleTickerProv
   bool _isEditing = false;
   bool _isLoggingOut = false;
   bool _showFabMenu = false;
+  bool _showPromoCode = false;
+  final TextEditingController _surveyController = TextEditingController();
 
   @override
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.userData['name'] ?? '');
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('settings').doc('appConfig').get();
+      if (doc.exists) {
+        setState(() => _showPromoCode = doc.data()?['showPromoCode'] ?? false);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -114,6 +126,96 @@ class _UserDetailsPageState extends State<UserDetailsPage> with SingleTickerProv
       setState(() => _isLoggingOut = false);
       if (mounted) {
         AppAlerts.show(context, 'Logout failed: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _showDeleteSurvey() async {
+    _surveyController.clear();
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1e293b),
+        title: const Text('Delete Account', style: TextStyle(color: Colors.redAccent)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'We are sorry to see you go. Why are you deleting your account?',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: _surveyController,
+              maxLines: 3,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Share your reason...',
+                hintStyle: const TextStyle(color: Colors.white30),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_surveyController.text.trim().isEmpty) {
+                AppAlerts.show(context, 'Please share your reason', isError: true);
+                return;
+              }
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Submit & Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      _performDelete();
+    }
+  }
+
+  Future<void> _performDelete() async {
+    setState(() => _isLoggingOut = true);
+    try {
+      final reason = _surveyController.text.trim();
+      
+      // Save survey result
+      await FirebaseFirestore.instance.collection('account_deletions').add({
+        'userId': widget.userId,
+        'mobile': widget.userData['mobile'],
+        'reason': reason,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      // Delete user document
+      await FirebaseFirestore.instance.collection('users').doc(widget.userId).delete();
+
+      // Delete Auth account
+      await FirebaseAuth.instance.currentUser?.delete();
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+        AppAlerts.show(context, 'Account deleted successfully');
+      }
+    } catch (e) {
+      setState(() => _isLoggingOut = false);
+      if (mounted) {
+        AppAlerts.show(context, 'Critical: Could not complete deletion. $e', isError: true);
       }
     }
   }
@@ -282,14 +384,23 @@ class _UserDetailsPageState extends State<UserDetailsPage> with SingleTickerProv
                                     },
                                   ),
                                 ),
+                              if (_showPromoCode) ...[
+                                const Text(
+                                  "this code is free code that can use your other tracking device free login use this code in here",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.white54, fontSize: 11, fontStyle: FontStyle.italic),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    final uri = Uri.parse("https://lankafrt.com/register.html");
+                                    if (await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  },
+                                  child: const Text("Register here", style: TextStyle(color: Color(0xFF00E5FF), decoration: TextDecoration.underline)),
+                                ),
+                              ],
                               const SizedBox(height: 30),
                               ElevatedButton.icon(
-                                onPressed: () async {
-                                  final Uri url = Uri.parse("https://www.lankafrt.com/login.html");
-                                  if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-                                    AppAlerts.show(context, 'Could not open website', isError: true);
-                                  }
-                                },
+                                onPressed: _showDeleteSurvey,
                                 icon: const Icon(Icons.delete_forever_outlined, color: Colors.white),
                                 label: const Text("Delete Account", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                                 style: ElevatedButton.styleFrom(

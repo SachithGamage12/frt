@@ -125,11 +125,13 @@ class _InterfacePageState extends State<InterfacePage>
     }
   }
 
-  Future<void> _checkTutorialVideo() async {
+  Future<void> _checkTutorialVideo({bool force = false}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final bool neverShow = prefs.getBool('neverShowTutorial') ?? false;
-      if (neverShow) return;
+      if (!force) {
+        final bool neverShow = prefs.getBool('neverShowTutorial') ?? false;
+        if (neverShow) return;
+      }
 
       final doc = await FirebaseFirestore.instance.collection('settings').doc('appConfig').get();
       if (doc.exists) {
@@ -137,7 +139,7 @@ class _InterfacePageState extends State<InterfacePage>
         if (data != null && data.containsKey('tutorialVideoUrl')) {
           final String? videoUrl = data['tutorialVideoUrl'];
           if (videoUrl != null && videoUrl.isNotEmpty) {
-            await Future.delayed(const Duration(seconds: 4));
+            if (!force) await Future.delayed(const Duration(seconds: 4));
             if (mounted) _showTutorialPopup(videoUrl);
           }
         }
@@ -1443,9 +1445,17 @@ class _InterfacePageState extends State<InterfacePage>
                   children: [
                     const Icon(Icons.help_outline, color: AppColors.primary, size: 16),
                     const SizedBox(width: 8),
-                    const Text(
-                      "Cant setup the App visit www.lankafrt.com",
-                      style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+                    GestureDetector(
+                      onTap: () => _checkTutorialVideo(force: true),
+                      child: const Text(
+                        "Cant setup the app click here to view",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -2316,7 +2326,7 @@ class _TutorialVideoDialogState extends State<TutorialVideoDialog> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'This is how FRT is working',
+                    'How to setup your account',
                     style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   IconButton(
