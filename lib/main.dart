@@ -750,14 +750,25 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             print("Skipping token update: $e");
           }
 
-          if (data['isAppUnlocked'] == true) {
+          bool isUnlocked = data['isAppUnlocked'] ?? false;
+          final dynamic expiryData = data['subscriptionExpiry'];
+          
+          if (isUnlocked && expiryData != null) {
+            final DateTime expiry = (expiryData as Timestamp).toDate();
+            if (DateTime.now().isAfter(expiry)) {
+              isUnlocked = false;
+              // Optional: Update Firestore to sync status
+              _firestore.collection('users').doc(_mobileController.text).update({'isAppUnlocked': false});
+            }
+          }
+
+          if (isUnlocked) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (context) => InterfacePage(userId: _mobileController.text),
               ),
             );
           } else {
-            // v28: No in-app payment. Redirect to activation status page.
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (context) => AwaitingActivationPage(userId: _mobileController.text),
