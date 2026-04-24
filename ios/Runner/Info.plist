@@ -21,7 +21,7 @@
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<string>31</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 
@@ -54,7 +54,7 @@
 
 	<!-- Photo & Camera -->
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Family Road Track uses your photo library to let you upload a profile picture and share payment receipts with the admin for account activation.</string>
+	<string>Family Road Track uses your photo library to let you upload a profile picture during registration.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Family Road Track uses your camera to scan QR codes shared by family members, enabling you to view their live location on the map.</string>
 
